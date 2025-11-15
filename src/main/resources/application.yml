@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: mcp-server4j
+
+  ai:
+    mcp:
+      server:
+        # Enable MCP server
+        enabled: true
+        # Use SSE transport (for HTTP-based MCP clients like Claude Code)
+        transport: sse
+        # Server info
+        name: "Knowledge Base RAG Server"
+        version: "1.0.0"
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# ChromaDB configuration
+chroma:
+  host: ${CHROMA_HOST:localhost}
+  port: ${CHROMA_PORT:8000}
+  collection-name: ${CHROMA_COLLECTION:baseline_kb}
+
+# Retrieval configuration
+retrieval:
+  # Hybrid search weights (must sum to 1.0)
+  bm25-weight: 0.3
+  vector-weight: 0.7
+  # Candidate pool size for hybrid fusion
+  candidate-pool-size: 20
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.mcp.server: DEBUG
+    org.springframework.ai: INFO
+    dev.langchain4j: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

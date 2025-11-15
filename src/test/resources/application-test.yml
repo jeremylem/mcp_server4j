@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: mcp-server-test
+
+  ai:
+    mcp:
+      server:
+        enabled: true
+        transport: stdio
+
+# Test-specific ChromaDB settings (use testcontainers)
+chroma:
+  host: localhost
+  port: 8000
+  collection-name: test_kb
+
+# Retrieval configuration
+retrieval:
+  bm25-weight: 0.3
+  vector-weight: 0.7
+  candidate-pool-size: 20
+
+logging:
+  level:
+    com.mcp.server: DEBUG
+    org.springframework.ai: DEBUG

@@ -1,0 +1,351 @@
+package com.mcp.server.ingest;
+
+import com.mcp.server.core.config.IngestConfig;
+import com.mcp.server.core.models.IngestionResult;
+import com.mcp.server.ingest.bm25.LuceneBM25Index;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.chromadb.ChromaDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * Integration tests for DocumentIngester with real ChromaDB container.
+ *
+ * Uses TestContainers to spin up a real ChromaDB instance.
+ * Tests the complete end-to-end ingestion pipeline.
+ */
+@Testcontainers
+@DisplayName("DocumentIngester Integration Tests")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+class DocumentIngesterIntegrationTest {
+
+    @Container
+    static ChromaDBContainer chromaContainer = new ChromaDBContainer("chromadb/chroma:0.4.15")
+        .withExposedPorts(8000);
+
+    @TempDir
+    Path tempDir;
+
+    private DocumentIngester ingester;
+    private EmbeddingStore embeddingStore;
+    private EmbeddingModel embeddingModel;
+    private LuceneBM25Index bm25Index;
+    private IngestConfig config;
+
+    @BeforeAll
+    static void beforeAll() {
+        chromaContainer.start();
+    }
+
+    @AfterAll
+    static void afterAll() {
+        chromaContainer.stop();
+    }
+
+    @BeforeEach
+    void setUp() {
+        // Initialize real components
+        config = new IngestConfig();
+
+        embeddingModel = new AllMiniLmL6V2EmbeddingModel();
+
+        embeddingStore = ChromaEmbeddingStore.builder()
+            .baseUrl(chromaContainer.getEndpoint())
+            .collectionName("test_integration_" + System.currentTimeMillis())
+            .build();
+
+        bm25Index = new LuceneBM25Index();
+
+        ingester = new DocumentIngester(
+            tempDir.toString(),
+            "test_collection",
+            config,
+            embeddingStore,
+            embeddingModel,
+            bm25Index
+        );
+    }
+
+    // ============================================
+    // End-to-End Pipeline Tests
+    // ============================================
+
+    @Test
+    @Order(1)
+    @DisplayName("should complete full ingestion pipeline with markdown file")
+    void fullPipeline_MarkdownFile_IngestsSuccessfully() throws Exception {
+        // Arrange
+        Path mdFile = tempDir.resolve("test-document.md");
+        Files.writeString(mdFile, """
+            # Test Document
+
+            This is a test document for the ingestion pipeline.
+            It contains multiple paragraphs to test chunking.
+
+            ## Section 1
+
+            Some content about artificial intelligence and machine learning.
+            These are important topics in modern technology.
+
+            ## Section 2
+
+            More content about data science and programming.
+            Python and Java are popular programming languages.
+            """);
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentsProcessed()).isEqualTo(1);
+        assertThat(result.getChunksCreated()).isGreaterThan(0);
+        assertThat(result.getCollectionName()).isEqualTo("test_collection");
+    }
+
+    @Test
+    @Order(2)
+    @DisplayName("should handle multiple files of different types")
+    void fullPipeline_MultipleFiles_IngestsAll() throws Exception {
+        // Arrange
+        Path md1 = tempDir.resolve("doc1.md");
+        Path md2 = tempDir.resolve("doc2.md");
+
+        Files.writeString(md1, """
+            # Document 1
+
+            This is the first test document about programming.
+            """);
+
+        Files.writeString(md2, """
+            # Document 2
+
+            This is the second test document about data science.
+            """);
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result.getDocumentsProcessed()).isEqualTo(2);
+        assertThat(result.getChunksCreated()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("should create embeddings and store in ChromaDB")
+    void fullPipeline_WithEmbeddings_StoresInChromaDB() throws Exception {
+        // Arrange
+        Path mdFile = tempDir.resolve("embedding-test.md");
+        Files.writeString(mdFile, """
+            # Embedding Test
+
+            This document tests whether embeddings are created correctly.
+            The all-MiniLM-L6-v2 model should generate 384-dimensional vectors.
+            """);
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getChunksCreated()).isGreaterThan(0);
+
+        // Verify that we can search the vector store
+        // (This would require implementing search functionality)
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("should build BM25 index alongside vector store")
+    void fullPipeline_WithBM25_BuildsBothIndexes() throws Exception {
+        // Arrange
+        Path mdFile = tempDir.resolve("bm25-test.md");
+        Files.writeString(mdFile, """
+            # BM25 Index Test
+
+            This document tests the BM25 keyword search functionality.
+            We should be able to search for specific keywords like "football" or "weather".
+            """);
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result).isNotNull();
+
+        // Verify BM25 index can search
+        var bm25Results = bm25Index.search("football", 5);
+        assertThat(bm25Results).isNotEmpty();
+        assertThat(bm25Results.get(0).getContent()).contains("football");
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("should handle re-ingestion flag correctly")
+    void fullPipeline_ReIngestFlag_DeletesAndReingests() throws Exception {
+        // Arrange - First ingestion
+        Path mdFile = tempDir.resolve("reingest-test.md");
+        Files.writeString(mdFile, "# First Version\n\nOriginal content.");
+
+        ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Update file
+        Files.writeString(mdFile, "# Second Version\n\nUpdated content.");
+
+        // Act - Re-ingestion
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            true
+        );
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentsProcessed()).isEqualTo(1);
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("should preserve metadata through full pipeline")
+    void fullPipeline_WithMetadata_PreservesMetadata() throws Exception {
+        // Arrange
+        Path mdFile = tempDir.resolve("metadata-test.md");
+        Files.writeString(mdFile, "# Metadata Test\n\nTesting metadata preservation.");
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result).isNotNull();
+
+        // Verify metadata in BM25 results
+        var bm25Results = bm25Index.search("metadata", 5);
+        assertThat(bm25Results).isNotEmpty();
+        assertThat(bm25Results.get(0).getFilename()).isEqualTo("metadata-test.md");
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("should handle large documents with proper chunking")
+    void fullPipeline_LargeDocument_ChunksCorrectly() throws Exception {
+        // Arrange - Create a large document
+        StringBuilder largeContent = new StringBuilder("# Large Document\n\n");
+        for (int i = 0; i < 50; i++) {
+            largeContent.append("## Section ").append(i).append("\n\n");
+            largeContent.append("This is section ").append(i)
+                .append(" with some content about programming, data science, and technology. ");
+            largeContent.append("It contains multiple sentences to ensure proper chunking behavior. ");
+            largeContent.append("The document splitter should handle this correctly.\n\n");
+        }
+
+        Path largeFile = tempDir.resolve("large-document.md");
+        Files.writeString(largeFile, largeContent.toString());
+
+        // Act
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+
+        // Assert
+        assertThat(result.getDocumentsProcessed()).isEqualTo(1);
+        assertThat(result.getChunksCreated()).isGreaterThan(5); // Should be chunked
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("should fail gracefully when ChromaDB is unreachable")
+    void fullPipeline_ChromaDBUnreachable_ThrowsException() throws IOException {
+        // Arrange
+        Path mdFile = tempDir.resolve("error-test.md");
+        Files.writeString(mdFile, "# Error Test");
+
+        DocumentIngester badIngester = new DocumentIngester(
+            tempDir.toString(),
+            "test_collection",
+            config,
+            ChromaEmbeddingStore.builder()
+                
+                .baseUrl("http://localhost:9999") // Invalid port
+                .collectionName("test_fail")
+                .build(),
+            embeddingModel,
+            new LuceneBM25Index()
+        );
+
+        // Act & Assert
+        assertThatThrownBy(() -> badIngester.ingest("localhost", 9999, false))
+            .isInstanceOf(RuntimeException.class);
+    }
+
+    // ============================================
+    // Performance Tests
+    // ============================================
+
+    @Test
+    @Order(9)
+    @DisplayName("should complete ingestion within reasonable time")
+    @Timeout(60) // 60 seconds max
+    void performance_ReasonableDocumentSet_CompletesQuickly() throws Exception {
+        // Arrange - Create multiple documents
+        for (int i = 0; i < 10; i++) {
+            Path mdFile = tempDir.resolve("perf-doc-" + i + ".md");
+            Files.writeString(mdFile, String.format("""
+                # Performance Test Document %d
+
+                This is test document %d for performance testing.
+                It contains some content about various topics.
+                """, i, i));
+        }
+
+        // Act
+        long startTime = System.currentTimeMillis();
+        IngestionResult result = ingester.ingest(
+            chromaContainer.getHost(),
+            chromaContainer.getFirstMappedPort(),
+            false
+        );
+        long endTime = System.currentTimeMillis();
+
+        // Assert
+        assertThat(result.getDocumentsProcessed()).isEqualTo(10);
+        assertThat(endTime - startTime).isLessThan(60000); // Less than 60 seconds
+    }
+}

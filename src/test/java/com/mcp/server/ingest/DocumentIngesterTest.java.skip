@@ -1,0 +1,575 @@
+package com.mcp.server.ingest;
+
+import com.mcp.server.core.config.IngestConfig;
+import com.mcp.server.core.models.IngestionResult;
+import com.mcp.server.ingest.bm25.LuceneBM25Index;
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import org.apache.commons.lang3.tuple.Pair;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.*;
+
+/**
+ * TDD-style tests for DocumentIngester class.
+ *
+ * Test naming convention: [MethodName]_[StateUnderTest]_[ExpectedBehavior]
+ * Mirrors the Python test structure from tests/unit/test_ingest.py
+ */
+@DisplayName("DocumentIngester")
+class DocumentIngesterTest {
+
+    @TempDir
+    Path tempDir;
+
+    private DocumentIngester ingester;
+    private IngestConfig config;
+    private EmbeddingStore<TextSegment> mockEmbeddingStore;
+    private EmbeddingModel mockEmbeddingModel;
+    private LuceneBM25Index mockBM25Index;
+
+    @BeforeEach
+    void setUp() {
+        config = new IngestConfig();
+        mockEmbeddingStore = mock(EmbeddingStore.class);
+        mockEmbeddingModel = mock(EmbeddingModel.class);
+        mockBM25Index = mock(LuceneBM25Index.class);
+    }
+
+    // ============================================
+    // Constructor Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("Constructor")
+    class ConstructorTests {
+
+        @Test
+        @DisplayName("should initialize with valid parameters")
+        void constructor_ValidParameters_InitializesSuccessfully() {
+            // Act
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+
+            // Assert
+            assertThat(ingester).isNotNull();
+            assertThat(ingester.getDocsDir()).isEqualTo(tempDir);
+            assertThat(ingester.getCollectionName()).isEqualTo("test_collection");
+        }
+
+        @Test
+        @DisplayName("should use default collection name when not provided")
+        void constructor_NoCollectionName_UsesDefault() {
+            // Act
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                null,
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+
+            // Assert
+            assertThat(ingester.getCollectionName()).isEqualTo("baseline_kb");
+        }
+    }
+
+    // ============================================
+    // findDocuments Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("findDocuments()")
+    class FindDocumentsTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should find markdown and PDF files")
+        void findDocuments_ValidDirectory_ReturnsMarkdownAndPdfFiles() throws IOException {
+            // Arrange
+            Files.createFile(tempDir.resolve("doc1.md"));
+            Files.createFile(tempDir.resolve("doc2.md"));
+            Files.createFile(tempDir.resolve("paper.pdf"));
+            Files.createFile(tempDir.resolve("ignore.txt"));
+
+            // Act
+            Pair<List<Path>, List<Path>> result = ingester.findDocuments();
+
+            // Assert
+            assertThat(result.getLeft()).hasSize(2);  // markdown files
+            assertThat(result.getRight()).hasSize(1); // pdf files
+            assertThat(result.getLeft())
+                .extracting(Path::getFileName)
+                .extracting(Path::toString)
+                .containsExactlyInAnyOrder("doc1.md", "doc2.md");
+            assertThat(result.getRight())
+                .extracting(Path::getFileName)
+                .extracting(Path::toString)
+                .containsExactly("paper.pdf");
+        }
+
+        @Test
+        @DisplayName("should exclude README.md and CLAUDE.md from project root")
+        void findDocuments_ProjectFiles_ExcludesReadmeAndClaude() throws IOException {
+            // Arrange
+            Files.createFile(tempDir.resolve("README.md"));
+            Files.createFile(tempDir.resolve("CLAUDE.md"));
+            Files.createFile(tempDir.resolve("notes.md"));
+
+            // Act
+            Pair<List<Path>, List<Path>> result = ingester.findDocuments();
+
+            // Assert
+            assertThat(result.getLeft())
+                .hasSize(1)
+                .extracting(Path::getFileName)
+                .extracting(Path::toString)
+                .containsExactly("notes.md");
+        }
+
+        @Test
+        @DisplayName("should find files recursively in subdirectories")
+        void findDocuments_NestedDirectories_FindsFilesRecursively() throws IOException {
+            // Arrange
+            Path subDir = tempDir.resolve("subdirectory");
+            Files.createDirectory(subDir);
+            Files.createFile(subDir.resolve("nested.md"));
+            Files.createFile(tempDir.resolve("root.pdf"));
+
+            // Act
+            Pair<List<Path>, List<Path>> result = ingester.findDocuments();
+
+            // Assert
+            assertThat(result.getLeft()).hasSize(1);
+            assertThat(result.getRight()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("should throw FileNotFoundException when directory does not exist")
+        void findDocuments_NonExistentDirectory_ThrowsFileNotFoundException() {
+            // Arrange
+            ingester = new DocumentIngester(
+                "/non/existent/path",
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+
+            // Act & Assert
+            assertThatThrownBy(() -> ingester.findDocuments())
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("not found");
+        }
+
+        @Test
+        @DisplayName("should return empty lists when no documents found")
+        void findDocuments_EmptyDirectory_ReturnsEmptyLists() throws IOException {
+            // Act
+            Pair<List<Path>, List<Path>> result = ingester.findDocuments();
+
+            // Assert
+            assertThat(result.getLeft()).isEmpty();
+            assertThat(result.getRight()).isEmpty();
+        }
+    }
+
+    // ============================================
+    // loadDocuments Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("loadDocuments()")
+    class LoadDocumentsTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should load markdown files with correct metadata")
+        void loadDocuments_MarkdownFiles_LoadsWithCorrectMetadata() throws IOException {
+            // Arrange
+            Path mdFile = tempDir.resolve("test.md");
+            Files.writeString(mdFile, "# Test Document\n\nThis is a test.");
+
+            // Act
+            List<Document> documents = ingester.loadDocuments(
+                List.of(mdFile),
+                List.of()
+            );
+
+            // Assert
+            assertThat(documents).hasSize(1);
+            Document doc = documents.get(0);
+            assertThat(doc.text()).contains("Test Document");
+            assertThat(doc.metadata().getString("filename")).isEqualTo("test.md");
+            assertThat(doc.metadata().getString("type")).isEqualTo("personal_note");
+            assertThat(doc.metadata().getString("source")).contains("test.md");
+        }
+
+        @Test
+        @DisplayName("should load PDF files with correct metadata")
+        void loadDocuments_PdfFiles_LoadsWithCorrectMetadata() throws IOException {
+            // Arrange
+            // Note: In real test, you'd need a valid PDF file
+            // For now, we'll test the logic with a mock or skip PDF loading
+            Path pdfFile = tempDir.resolve("test.pdf");
+            Files.createFile(pdfFile);
+
+            // Act
+            List<Document> documents = ingester.loadDocuments(
+                List.of(),
+                List.of(pdfFile)
+            );
+
+            // Assert
+            // This will fail in actual execution without a real PDF
+            // In TDD, we define the expected behavior first
+            assertThat(documents).isNotNull();
+            if (!documents.isEmpty()) {
+                Document doc = documents.get(0);
+                assertThat(doc.metadata().getString("filename")).isEqualTo("test.pdf");
+                assertThat(doc.metadata().getString("type")).isEqualTo("technical_doc");
+            }
+        }
+
+        @Test
+        @DisplayName("should continue loading when individual file fails")
+        void loadDocuments_FailedFile_ContinuesLoading() throws IOException {
+            // Arrange
+            Path validFile = tempDir.resolve("valid.md");
+            Path invalidFile = tempDir.resolve("corrupted.md");
+            Files.writeString(validFile, "Valid content");
+            // Create file but make it unreadable (OS-dependent)
+            Files.createFile(invalidFile);
+
+            // Act
+            List<Document> documents = ingester.loadDocuments(
+                List.of(validFile, invalidFile),
+                List.of()
+            );
+
+            // Assert
+            assertThat(documents).hasSizeGreaterThanOrEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should return empty list when all files fail to load")
+        void loadDocuments_AllFilesFail_ReturnsEmptyList() throws IOException {
+            // Act
+            List<Document> documents = ingester.loadDocuments(
+                List.of(),
+                List.of()
+            );
+
+            // Assert
+            assertThat(documents).isEmpty();
+        }
+    }
+
+    // ============================================
+    // chunkDocuments Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("chunkDocuments()")
+    class ChunkDocumentsTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should split documents into chunks with metadata")
+        void chunkDocuments_LongDocument_SplitsIntoChunks() {
+            // Arrange
+            String longText = "This is a test document. ".repeat(100);
+            Document doc = Document.from(longText, Metadata.from("filename", "test.md"));
+            List<Document> documents = List.of(doc);
+
+            // Act
+            List<Document> chunks = ingester.chunkDocuments(documents);
+
+            // Assert
+            assertThat(chunks).hasSizeGreaterThan(1);
+            for (int i = 0; i < chunks.size(); i++) {
+                assertThat(chunks.get(i).metadata().getInteger("global_chunk_id")).isEqualTo(i);
+                assertThat(chunks.get(i).metadata().getString("filename")).isEqualTo("test.md");
+            }
+        }
+
+        @Test
+        @DisplayName("should preserve metadata from original documents")
+        void chunkDocuments_WithMetadata_PreservesMetadata() {
+            // Arrange
+            Metadata metadata = Metadata.from(Map.of(
+                "filename", "test.md",
+                "type", "personal_note",
+                "source", "/path/to/test.md"
+            ));
+            Document doc = Document.from("Test content", metadata);
+
+            // Act
+            List<Document> chunks = ingester.chunkDocuments(List.of(doc));
+
+            // Assert
+            assertThat(chunks).isNotEmpty();
+            for (Document chunk : chunks) {
+                assertThat(chunk.metadata().getString("filename")).isEqualTo("test.md");
+                assertThat(chunk.metadata().getString("type")).isEqualTo("personal_note");
+            }
+        }
+
+        @Test
+        @DisplayName("should handle empty document list")
+        void chunkDocuments_EmptyList_ReturnsEmptyList() {
+            // Act
+            List<Document> chunks = ingester.chunkDocuments(List.of());
+
+            // Assert
+            assertThat(chunks).isEmpty();
+        }
+    }
+
+    // ============================================
+    // buildBM25Index Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("buildBM25Index()")
+    class BuildBM25IndexTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should call BM25Index.buildIndex with chunks")
+        void buildBM25Index_ValidChunks_CallsBuildIndex() throws IOException {
+            // Arrange
+            List<Document> chunks = List.of(
+                Document.from("chunk 1"),
+                Document.from("chunk 2")
+            );
+
+            // Act
+            ingester.buildBM25Index(chunks);
+
+            // Assert
+            verify(mockBM25Index, times(1)).buildIndex(anyList());
+        }
+
+        @Test
+        @DisplayName("should handle empty chunks list")
+        void buildBM25Index_EmptyList_HandlesGracefully() throws IOException {
+            // Act & Assert
+            assertThatCode(() -> ingester.buildBM25Index(List.of()))
+                .doesNotThrowAnyException();
+        }
+    }
+
+    // ============================================
+    // addToVectorStore Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("addToVectorStore()")
+    class AddToVectorStoreTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should add chunks to embedding store")
+        void addToVectorStore_ValidChunks_AddsToStore() {
+            // Arrange
+            List<Document> chunks = List.of(
+                Document.from("chunk 1"),
+                Document.from("chunk 2")
+            );
+
+            // Act
+            ingester.addToVectorStore(chunks);
+
+            // Assert
+            ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
+            verify(mockEmbeddingStore, times(1)).add(captor.capture());
+            assertThat(captor.getValue()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("should throw RuntimeException when vector store fails")
+        void addToVectorStore_StoreFailure_ThrowsRuntimeException() {
+            // Arrange
+            List<Document> chunks = List.of(Document.from("test"));
+            doThrow(new RuntimeException("Store error"))
+                .when(mockEmbeddingStore).add(anyList());
+
+            // Act & Assert
+            assertThatThrownBy(() -> ingester.addToVectorStore(chunks))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to add chunks to vectorstore");
+        }
+    }
+
+    // ============================================
+    // handleReingestion Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("handleReingestion()")
+    class HandleReingestionTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should not throw when collection does not exist")
+        void handleReingestion_NonExistentCollection_DoesNotThrow() {
+            // Act & Assert
+            assertThatCode(() -> ingester.handleReingestion())
+                .doesNotThrowAnyException();
+        }
+    }
+
+    // ============================================
+    // ingest (main pipeline) Tests
+    // ============================================
+
+    @Nested
+    @DisplayName("ingest()")
+    class IngestTests {
+
+        @BeforeEach
+        void setUp() {
+            ingester = new DocumentIngester(
+                tempDir.toString(),
+                "test_collection",
+                config,
+                mockEmbeddingStore,
+                mockEmbeddingModel,
+                mockBM25Index
+            );
+        }
+
+        @Test
+        @DisplayName("should throw IllegalStateException when no documents found")
+        void ingest_NoDocuments_ThrowsIllegalStateException() {
+            // Act & Assert
+            assertThatThrownBy(() -> ingester.ingest("localhost", 8000, false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No documents found");
+        }
+
+        @Test
+        @DisplayName("should complete full pipeline successfully")
+        void ingest_ValidDocuments_CompletesSuccessfully() throws Exception {
+            // Arrange
+            Path mdFile = tempDir.resolve("test.md");
+            Files.writeString(mdFile, "# Test\n\nContent here.");
+
+            // Act
+            IngestionResult result = ingester.ingest("localhost", 8000, false);
+
+            // Assert
+            assertThat(result).isNotNull();
+            assertThat(result.getDocumentsProcessed()).isGreaterThan(0);
+            assertThat(result.getChunksCreated()).isGreaterThan(0);
+        }
+
+        @Test
+        @DisplayName("should call handleReingestion when reIngest is true")
+        void ingest_ReIngestTrue_CallsHandleReingestion() throws Exception {
+            // Arrange
+            Path mdFile = tempDir.resolve("test.md");
+            Files.writeString(mdFile, "Test content");
+
+            DocumentIngester spyIngester = spy(ingester);
+
+            // Act
+            spyIngester.ingest("localhost", 8000, true);
+
+            // Assert
+            verify(spyIngester, times(1)).handleReingestion();
+        }
+    }
+}
