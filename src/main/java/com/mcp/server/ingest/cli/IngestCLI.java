@@ -68,63 +68,60 @@ public class IngestCLI implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        System.out.println("=============================================================");
-        System.out.println("        MCP Server 4J - Document Ingestion                ");
-        System.out.println("=============================================================");
+        System.out.println("MCP Server 4J - Document Ingestion");
         System.out.println();
 
         try {
-            // Create configuration
-            IngestConfig config = new IngestConfig();
-
-            // Create factory for components
-            IngestionComponentFactory factory = new DefaultIngestionComponentFactory();
-
-            // Build pipeline using factory and builder pattern
-            IngestionPipeline pipeline = DocumentIngestionPipeline.builder()
-                .withDocumentFinder(factory.createDocumentFinder())
-                .withDocumentLoader(factory.createDocumentLoader())
-                .withDocumentChunker(factory.createDocumentChunker(config))
-                .withKeywordIndexer(factory.createKeywordIndexer())  // BM25 index persisted to disk
-                .withVectorStore(factory.createVectorStore(chromaHost, chromaPort, collectionName, config))
-                .build();
-
-            // Create request using builder pattern
-            IngestionRequest request = IngestionRequest.builder()
-                .docsDir(Paths.get(docsDir))
-                .collectionName(collectionName)
-                .chromaHost(chromaHost)
-                .chromaPort(chromaPort)
-                .reIngest(reIngest)
-                .build();
-
-            // Execute pipeline
+            IngestionPipeline pipeline = createPipeline();
+            IngestionRequest request = createRequest();
             IngestionResult result = pipeline.ingest(request);
-
-            // Print results
-            System.out.println();
-            System.out.println("=============================================================");
-            System.out.println("                  SUCCESS                                    ");
-            System.out.println("=============================================================");
-            System.out.println();
-            System.out.println("  Documents processed: " + result.getDocumentsProcessed());
-            System.out.println("  Chunks created:      " + result.getChunksCreated());
-            System.out.println("  Collection:          " + result.getCollectionName());
-            System.out.println();
-
-            return 0; // Success
-
+            printSuccess(result);
+            return 0;
         } catch (Exception e) {
-            System.err.println();
-            System.err.println("=============================================================");
-            System.err.println("                  FAILURE                                    ");
-            System.err.println("=============================================================");
-            System.err.println();
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-
-            return 1; // Failure
+            printFailure(e);
+            return 1;
         }
+    }
+
+    private IngestionPipeline createPipeline() {
+        IngestConfig config = new IngestConfig();
+        IngestionComponentFactory factory = new DefaultIngestionComponentFactory();
+
+        return DocumentIngestionPipeline.builder()
+            .withDocumentFinder(factory.createDocumentFinder())
+            .withDocumentLoader(factory.createDocumentLoader())
+            .withDocumentChunker(factory.createDocumentChunker(config))
+            .withKeywordIndexer(factory.createKeywordIndexer())
+            .withVectorStore(factory.createVectorStore(chromaHost, chromaPort, collectionName, config))
+            .build();
+    }
+
+    private IngestionRequest createRequest() {
+        return IngestionRequest.builder()
+            .docsDir(Paths.get(docsDir))
+            .collectionName(collectionName)
+            .chromaHost(chromaHost)
+            .chromaPort(chromaPort)
+            .reIngest(reIngest)
+            .build();
+    }
+
+    private void printSuccess(IngestionResult result) {
+        System.out.println();
+        System.out.println("SUCCESS");
+        System.out.println();
+        System.out.println("Documents processed: " + result.getDocumentsProcessed());
+        System.out.println("Chunks created: " + result.getChunksCreated());
+        System.out.println("Collection: " + result.getCollectionName());
+        System.out.println();
+    }
+
+    private void printFailure(Exception e) {
+        System.err.println();
+        System.err.println("FAILURE");
+        System.err.println();
+        System.err.println("Error: " + e.getMessage());
+        e.printStackTrace();
     }
 
     /**

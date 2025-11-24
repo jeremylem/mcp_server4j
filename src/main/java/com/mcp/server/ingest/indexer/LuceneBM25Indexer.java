@@ -92,7 +92,7 @@ public class LuceneBM25Indexer implements KeywordIndexer {
         }
 
         try {
-            return Files.exists(indexPath) && DirectoryReader.indexExists(FSDirectory.open(indexPath));
+            return Files.exists(indexPath) && DirectoryReader.indexExists(new org.apache.lucene.store.NIOFSDirectory(indexPath));
         } catch (IOException e) {
             logger.warn("Error checking if index exists: {}", e.getMessage());
             return false;
@@ -116,8 +116,8 @@ public class LuceneBM25Indexer implements KeywordIndexer {
         logger.info("Loading BM25 index from disk: {}", indexPath);
 
         try {
-            // Open existing FSDirectory
-            this.directory = FSDirectory.open(indexPath);
+            // Open existing directory using NIOFSDirectory (avoids MMapDirectory Foreign Memory API issues)
+            this.directory = new org.apache.lucene.store.NIOFSDirectory(indexPath);
 
             // Open existing index reader
             this.indexReader = DirectoryReader.open(directory);
@@ -139,77 +139,78 @@ public class LuceneBM25Indexer implements KeywordIndexer {
         logger.info("Building Lucene BM25 index with {} documents", documents.size());
 
         try {
-            // Create directory (FSDirectory for persistence, ByteBuffersDirectory for in-memory)
-            if (indexPath != null) {
-                // Ensure parent directory exists
-                if (!Files.exists(indexPath.getParent())) {
-                    Files.createDirectories(indexPath.getParent());
-                }
-                this.directory = FSDirectory.open(indexPath);
-                logger.info("Using persistent storage: {}", indexPath);
-            } else {
-                this.directory = new ByteBuffersDirectory();
-                logger.info("Using in-memory storage");
-            }
-
-            // Configure index writer with BM25 similarity
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            config.setSimilarity(new BM25Similarity(K1, B));
-
-            this.indexWriter = new IndexWriter(directory, config);
-
-            // Index all documents
-            int indexed = 0;
-            for (int i = 0; i < documents.size(); i++) {
-                Document doc = documents.get(i);
-
-                org.apache.lucene.document.Document luceneDoc =
-                        new org.apache.lucene.document.Document();
-
-                // Add text content (indexed and stored)
-                String content = doc.text();
-                if (content != null && !content.isEmpty()) {
-                    luceneDoc.add(new TextField("content", content, Field.Store.YES));
-                } else {
-                    // Skip empty documents
-                    continue;
-                }
-
-                // Add document ID (stored, not indexed for search)
-                String id = doc.metadata().getString("id");
-                if (id == null) {
-                    id = String.valueOf(i);
-                }
-                luceneDoc.add(new StringField("id", id, Field.Store.YES));
-
-                // Add filename metadata (stored)
-                String filename = doc.metadata().getString("filename");
-                if (filename != null) {
-                    luceneDoc.add(new StringField("filename", filename, Field.Store.YES));
-                }
-
-                indexWriter.addDocument(luceneDoc);
-                indexed++;
-            }
-
-            // Commit changes
-            indexWriter.commit();
-
-            // Create searcher with BM25 similarity
-            this.indexReader = DirectoryReader.open(indexWriter);
-            this.indexSearcher = new IndexSearcher(indexReader);
-            this.indexSearcher.setSimilarity(new BM25Similarity(K1, B));
-
-            this.indexBuilt = true;
-
-            if (indexPath != null) {
-                logger.info("BM25 index built and persisted successfully with {} documents at {}", indexed, indexPath);
-            } else {
-                logger.info("BM25 index built successfully (in-memory) with {} documents", indexed);
-            }
-
+            initializeDirectory();
+            createIndexWriter();
+            int indexed = indexDocuments(documents);
+            finalizeIndex(indexed);
         } catch (IOException e) {
             throw new IndexingException("Failed to build BM25 index", e);
+        }
+    }
+
+    private void initializeDirectory() throws IOException {
+        if (indexPath != null) {
+            if (!Files.exists(indexPath.getParent())) {
+                Files.createDirectories(indexPath.getParent());
+            }
+            // Use NIOFSDirectory instead of MMapDirectory to avoid Foreign Memory API issues
+            this.directory = new org.apache.lucene.store.NIOFSDirectory(indexPath);
+            logger.info("Using persistent storage: {}", indexPath);
+        } else {
+            this.directory = new ByteBuffersDirectory();
+            logger.info("Using in-memory storage");
+        }
+    }
+
+    private void createIndexWriter() throws IOException {
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setSimilarity(new BM25Similarity(K1, B));
+        this.indexWriter = new IndexWriter(directory, config);
+    }
+
+    private int indexDocuments(List<Document> documents) throws IOException {
+        int indexed = 0;
+        for (int i = 0; i < documents.size(); i++) {
+            Document doc = documents.get(i);
+            if (addDocumentToIndex(doc, i)) {
+                indexed++;
+            }
+        }
+        indexWriter.commit();
+        return indexed;
+    }
+
+    private boolean addDocumentToIndex(Document doc, int position) throws IOException {
+        String content = doc.text();
+        if (content == null || content.isEmpty()) {
+            return false;
+        }
+
+        org.apache.lucene.document.Document luceneDoc = new org.apache.lucene.document.Document();
+        luceneDoc.add(new TextField("content", content, Field.Store.YES));
+
+        String id = doc.metadata().getString("id");
+        luceneDoc.add(new StringField("id", id != null ? id : String.valueOf(position), Field.Store.YES));
+
+        String filename = doc.metadata().getString("filename");
+        if (filename != null) {
+            luceneDoc.add(new StringField("filename", filename, Field.Store.YES));
+        }
+
+        indexWriter.addDocument(luceneDoc);
+        return true;
+    }
+
+    private void finalizeIndex(int indexed) throws IOException {
+        this.indexReader = DirectoryReader.open(indexWriter);
+        this.indexSearcher = new IndexSearcher(indexReader);
+        this.indexSearcher.setSimilarity(new BM25Similarity(K1, B));
+        this.indexBuilt = true;
+
+        if (indexPath != null) {
+            logger.info("BM25 index built and persisted with {} documents at {}", indexed, indexPath);
+        } else {
+            logger.info("BM25 index built (in-memory) with {} documents", indexed);
         }
     }
 

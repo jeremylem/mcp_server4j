@@ -1,5 +1,7 @@
 package com.mcp.server.core.models;
 
+import lombok.Getter;
+
 /**
  * Result object returned from document ingestion.
  *
@@ -13,9 +15,12 @@ package com.mcp.server.core.models;
  */
 public class IngestionResult {
 
+    @Getter
     private final int documentsProcessed;
+    @Getter
     private final int chunksCreated;
     private final int totalInCollection;
+    @Getter
     private final String collectionName;
 
     /**
@@ -32,22 +37,6 @@ public class IngestionResult {
         this.chunksCreated = chunksCreated;
         this.totalInCollection = totalInCollection;
         this.collectionName = collectionName;
-    }
-
-    public int getDocumentsProcessed() {
-        return documentsProcessed;
-    }
-
-    public int getChunksCreated() {
-        return chunksCreated;
-    }
-
-    public int getTotalInCollection() {
-        return totalInCollection;
-    }
-
-    public String getCollectionName() {
-        return collectionName;
     }
 
     @Override

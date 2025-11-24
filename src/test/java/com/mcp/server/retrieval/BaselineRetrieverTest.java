@@ -53,48 +53,43 @@ class BaselineRetrieverTest {
     class InitializeTests {
 
         @Test
-        @DisplayName("should fetch documents from ChromaDB and build BM25 index")
-        void initialize_DocumentsExist_BuildsBM25Index() {
+        @DisplayName("should load BM25 index from disk if it exists")
+        void initialize_IndexExists_LoadsIndex() {
             // Arrange
-            List<Document> documents = Arrays.asList(
-                createDocument("Content 1", "doc1.md"),
-                createDocument("Content 2", "doc2.md")
-            );
-            when(vectorSearch.getAllDocuments()).thenReturn(documents);
+            when(bm25Indexer.indexExistsOnDisk()).thenReturn(true);
 
             // Act
             retriever.initialize();
 
             // Assert
-            verify(vectorSearch).getAllDocuments();
-            verify(bm25Indexer).buildIndex(documents);
+            verify(bm25Indexer).indexExistsOnDisk();
+            verify(bm25Indexer).loadIndex();
         }
 
         @Test
-        @DisplayName("should handle empty collection gracefully")
-        void initialize_NoDocuments_HandlesGracefully() {
+        @DisplayName("should handle missing index gracefully")
+        void initialize_NoIndex_HandlesGracefully() {
             // Arrange
-            when(vectorSearch.getAllDocuments()).thenReturn(Collections.emptyList());
+            when(bm25Indexer.indexExistsOnDisk()).thenReturn(false);
 
-            // Act
-            retriever.initialize();
-
-            // Assert
-            verify(vectorSearch).getAllDocuments();
-            verify(bm25Indexer, never()).buildIndex(any());
+            // Act & Assert - Should not throw
+            assertThatNoException().isThrownBy(() -> retriever.initialize());
+            verify(bm25Indexer).indexExistsOnDisk();
+            verify(bm25Indexer, never()).loadIndex();
         }
 
         @Test
-        @DisplayName("should throw exception when initialization fails")
-        void initialize_FetchFails_ThrowsException() {
+        @DisplayName("should throw exception when index load fails")
+        void initialize_LoadFails_ThrowsException() {
             // Arrange
-            when(vectorSearch.getAllDocuments())
-                .thenThrow(new RuntimeException("ChromaDB connection failed"));
+            when(bm25Indexer.indexExistsOnDisk()).thenReturn(true);
+            doThrow(new RuntimeException("Failed to load index"))
+                .when(bm25Indexer).loadIndex();
 
             // Act & Assert
             assertThatThrownBy(() -> retriever.initialize())
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to initialize retriever");
+                .hasMessageContaining("Initialization failed");
         }
     }
 

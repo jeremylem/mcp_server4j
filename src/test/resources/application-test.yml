@@ -2,6 +2,10 @@ spring:
   application:
     name: mcp-server-test
 
+  # Allow bean definition overriding for test configuration
+  main:
+    allow-bean-definition-overriding: true
+
   ai:
     mcp:
       server:

@@ -128,9 +128,7 @@ fi
 
 # --- Show Status ---
 echo ""
-echo "======================================"
 echo "MCP Server (Java) is starting..."
-echo "======================================"
 echo ""
 echo "Services:"
 echo "  - ChromaDB:   http://localhost:8000"

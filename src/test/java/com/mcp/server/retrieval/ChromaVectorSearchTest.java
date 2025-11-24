@@ -243,7 +243,7 @@ class ChromaVectorSearchTest {
             // Arrange
             float[] dummyEmbedding = new float[]{0.1f};
             Embedding queryEmbedding = new Embedding(dummyEmbedding);
-            when(embeddingModel.embed("")).thenReturn(Response.from(queryEmbedding));
+            when(embeddingModel.embed("document")).thenReturn(Response.from(queryEmbedding));
 
             TextSegment segment1 = TextSegment.from("Content 1", createMetadata("file1.md", "note"));
             TextSegment segment2 = TextSegment.from("Content 2", createMetadata("file2.md", "doc"));
@@ -269,7 +269,7 @@ class ChromaVectorSearchTest {
         void getAllDocuments_NoDocuments_ReturnsEmptyList() {
             // Arrange
             float[] dummyEmbedding = new float[]{0.1f};
-            when(embeddingModel.embed("")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
+            when(embeddingModel.embed("document")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
                 .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
 
@@ -285,7 +285,7 @@ class ChromaVectorSearchTest {
         void getAllDocuments_FetchFails_ThrowsException() {
             // Arrange
             float[] dummyEmbedding = new float[]{0.1f};
-            when(embeddingModel.embed("")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
+            when(embeddingModel.embed("document")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
                 .thenThrow(new RuntimeException("ChromaDB connection failed"));
 

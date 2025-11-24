@@ -79,17 +79,17 @@ public class HybridScoreFusion {
 
         // Normalize by max score
         float maxBm25 = bm25Results.stream()
-                .map(SearchResult::getScore)
+                .map(SearchResult::score)
                 .max(Float::compare)
                 .orElse(1.0f);
 
         for (SearchResult result : bm25Results) {
-            String docId = getDocumentId(result.getContent(), result.getFilename());
-            float normalizedScore = maxBm25 > 0 ? result.getScore() / maxBm25 : 0.0f;
+            String docId = getDocumentId(result.content(), result.filename());
+            float normalizedScore = maxBm25 > 0 ? result.score() / maxBm25 : 0.0f;
             float weightedScore = config.getBm25Weight() * normalizedScore;
 
             hybridScores.put(docId, new HybridScore(
-                    result.getContent(),
+                    result.content(),
                     createMetadata(result),
                     weightedScore
             ));
@@ -162,11 +162,11 @@ public class HybridScoreFusion {
      */
     private Map<String, String> createMetadata(SearchResult result) {
         Map<String, String> metadata = new HashMap<>();
-        if (result.getFilename() != null) {
-            metadata.put("filename", result.getFilename());
+        if (result.filename() != null) {
+            metadata.put("filename", result.filename());
         }
-        if (result.getId() != null) {
-            metadata.put("id", result.getId());
+        if (result.id() != null) {
+            metadata.put("id", result.id());
         }
         return metadata;
     }

@@ -12,14 +12,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Orchestrates the complete document ingestion pipeline.
- *
- * This is the main pipeline implementation that follows SOLID principles:
- * - Single Responsibility: Only orchestrates the pipeline steps
- * - Open/Closed: Open for extension via interface implementations
- * - Liskov Substitution: Works with any interface implementations
- * - Interface Segregation: Depends on focused interfaces
- * - Dependency Inversion: Depends on abstractions, not concrete classes
+ * Document ingestion pipeline orchestrator.
  */
 public class DocumentIngestionPipeline implements IngestionPipeline {
 
@@ -31,9 +24,6 @@ public class DocumentIngestionPipeline implements IngestionPipeline {
     private final KeywordIndexer keywordIndexer;  // For BM25 index building
     private final VectorStore vectorStore;
 
-    /**
-     * Private constructor - use Builder to create instances.
-     */
     private DocumentIngestionPipeline(Builder builder) {
         this.documentFinder = builder.documentFinder;
         this.documentLoader = builder.documentLoader;
@@ -44,60 +34,34 @@ public class DocumentIngestionPipeline implements IngestionPipeline {
 
     @Override
     public IngestionResult ingest(IngestionRequest request) {
-        logger.info("=".repeat(60));
-        logger.info("Document Ingestion - Baseline + Hybrid Search");
-        logger.info("=".repeat(60));
-        logger.info("Documents directory: {}", request.getDocsDir());
-        logger.info("Re-ingest mode: {}", request.isReIngest());
-        logger.info("=".repeat(60));
+        logger.info("Starting ingestion: {} (re-ingest={})", request.getDocsDir(), request.isReIngest());
 
         try {
-            // Step 1: Handle re-ingestion
             if (request.isReIngest()) {
                 vectorStore.reset();
             }
 
-            // Step 2: Find documents
             List<Path> paths = documentFinder.findDocuments(request.getDocsDir());
-
             if (paths.isEmpty()) {
-                throw new IngestionException("No documents found to ingest in: " + request.getDocsDir());
+                throw new IngestionException("No documents found in: " + request.getDocsDir());
             }
 
-            // Step 3: Load documents
             List<Document> documents = documentLoader.loadDocuments(paths);
-
             if (documents.isEmpty()) {
-                throw new IngestionException("No documents were successfully loaded!");
+                throw new IngestionException("No documents loaded");
             }
 
-            // Step 4: Chunk documents
             List<Document> chunks = documentChunker.chunkDocuments(documents);
 
-            // Step 5: Build BM25 index (persisted to disk)
-            logger.info("-".repeat(60));
-            logger.info("Building BM25 index for keyword search...");
+            logger.info("Building BM25 index...");
             keywordIndexer.buildIndex(chunks);
-            logger.info("BM25 index built and persisted");
+            logger.info("BM25 index built");
 
-            // Step 6: Add chunks to vector store
             vectorStore.addDocuments(chunks);
 
-            // Step 7: Verify ingestion
-            logger.info("-".repeat(60));
-            logger.info("Verifying ingestion...");
             int totalChunks = vectorStore.count();
-            logger.info("Verification complete");
-
-            // Summary
-            logger.info("=".repeat(60));
-            logger.info("INGESTION COMPLETE");
-            logger.info("=".repeat(60));
-            logger.info("Documents processed: {}", documents.size());
-            logger.info("Chunks created: {}", chunks.size());
-            logger.info("Total in collection: {}", totalChunks);
-            logger.info("Collection: {}", request.getCollectionName());
-            logger.info("=".repeat(60));
+            logger.info("Ingestion complete: {} docs, {} chunks, {} total",
+                documents.size(), chunks.size(), totalChunks);
 
             return new IngestionResult(
                 documents.size(),
@@ -109,24 +73,14 @@ public class DocumentIngestionPipeline implements IngestionPipeline {
         } catch (IngestionException e) {
             throw e;
         } catch (Exception e) {
-            throw new IngestionException("Ingestion pipeline failed", e);
+            throw new IngestionException("Ingestion failed", e);
         }
     }
 
-    /**
-     * Create a builder for constructing DocumentIngestionPipeline instances.
-     *
-     * @return New builder instance
-     */
     public static Builder builder() {
         return new Builder();
     }
 
-    /**
-     * Builder for DocumentIngestionPipeline.
-     *
-     * Enforces that all required components are provided.
-     */
     public static class Builder {
         private DocumentFinder documentFinder;
         private DocumentLoader documentLoader;
@@ -163,22 +117,11 @@ public class DocumentIngestionPipeline implements IngestionPipeline {
         }
 
         public DocumentIngestionPipeline build() {
-            // Validate all components are provided
-            if (documentFinder == null) {
-                throw new IllegalStateException("DocumentFinder is required");
-            }
-            if (documentLoader == null) {
-                throw new IllegalStateException("DocumentLoader is required");
-            }
-            if (documentChunker == null) {
-                throw new IllegalStateException("DocumentChunker is required");
-            }
-            if (keywordIndexer == null) {
-                throw new IllegalStateException("KeywordIndexer is required");
-            }
-            if (vectorStore == null) {
-                throw new IllegalStateException("VectorStore is required");
-            }
+            if (documentFinder == null) throw new IllegalStateException("DocumentFinder required");
+            if (documentLoader == null) throw new IllegalStateException("DocumentLoader required");
+            if (documentChunker == null) throw new IllegalStateException("DocumentChunker required");
+            if (keywordIndexer == null) throw new IllegalStateException("KeywordIndexer required");
+            if (vectorStore == null) throw new IllegalStateException("VectorStore required");
 
             return new DocumentIngestionPipeline(this);
         }

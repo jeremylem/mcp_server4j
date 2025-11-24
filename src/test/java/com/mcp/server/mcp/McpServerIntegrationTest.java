@@ -1,6 +1,6 @@
 package com.mcp.server.mcp;
 
-import com.mcp.server.core.interfaces.Retriever;
+import com.mcp.server.retrieval.BaselineRetriever;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.Metadata;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.chromadb.ChromaDBContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.Map;
@@ -23,32 +28,53 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - MCP tool registration (query_knowledge_base)
  * - Retriever integration
  * - Hybrid search functionality
+ *
+ * Uses TestContainers to spin up a real ChromaDB instance for testing.
+ * This makes the test self-contained and doesn't require external ChromaDB.
  */
 @SpringBootTest
 @Import(McpServerTestConfig.class)
 @ActiveProfiles("test")
+@Testcontainers
 class McpServerIntegrationTest {
 
+    @Container
+    static ChromaDBContainer chromaContainer = new ChromaDBContainer("chromadb/chroma:0.4.23");
+
+    /**
+     * Configure Spring Boot to use the TestContainers ChromaDB instance.
+     * This overrides the properties from application-test.yml.
+     */
+    @DynamicPropertySource
+    static void setChromaProperties(DynamicPropertyRegistry registry) {
+        registry.add("chroma.host", chromaContainer::getHost);
+        registry.add("chroma.port", chromaContainer::getFirstMappedPort);
+    }
+
     @Autowired
-    private Retriever retriever;
+    private BaselineRetriever retriever;
 
     @Autowired(required = false)
     private KnowledgeBaseTool knowledgeBaseTool;
 
+    private static boolean documentsIngested = false;
+
     @BeforeEach
     void setUp() {
-        // Add test documents
-        List<Document> testDocs = List.of(
-                Document.from("Python is a high-level programming language",
-                        Metadata.from(Map.of("source", "test1.md", "type", "technical_doc"))),
-                Document.from("Java is a statically typed programming language",
-                        Metadata.from(Map.of("source", "test2.md", "type", "technical_doc"))),
-                Document.from("BM25 is a keyword-based ranking algorithm",
-                        Metadata.from(Map.of("source", "test3.md", "type", "technical_doc")))
-        );
+        // Only ingest documents once to avoid test interference
+        if (!documentsIngested) {
+            List<Document> testDocs = List.of(
+                    Document.from("Python is a high-level programming language",
+                            Metadata.from(Map.of("source", "test1.md", "type", "technical_doc"))),
+                    Document.from("Java is a statically typed programming language",
+                            Metadata.from(Map.of("source", "test2.md", "type", "technical_doc"))),
+                    Document.from("BM25 is a keyword-based ranking algorithm",
+                            Metadata.from(Map.of("source", "test3.md", "type", "technical_doc")))
+            );
 
-        retriever.addDocuments(testDocs);
-        retriever.initialize();
+            retriever.addDocuments(testDocs);
+            documentsIngested = true;
+        }
     }
 
     @Test

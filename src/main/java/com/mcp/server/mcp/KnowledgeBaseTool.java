@@ -68,8 +68,8 @@ public class KnowledgeBaseTool implements Function<KnowledgeBaseTool.Request, Kn
     @Override
     public KnowledgeBaseOutput apply(Request request) {
         String query = request.query();
-        Integer topK = request.topK() != null ? request.topK() : 5;
-        Boolean useHybrid = request.useHybrid() != null ? request.useHybrid() : true;
+        int topK = request.topK() != null ? request.topK() : 5;
+        boolean useHybrid = request.useHybrid() != null ? request.useHybrid() : true;
 
         logger.info("MCP tool invoked: query='{}', topK={}, hybrid={}", query, topK, useHybrid);
 

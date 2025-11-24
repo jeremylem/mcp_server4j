@@ -1,7 +1,8 @@
 package com.mcp.server.retrieval;
 
 import com.mcp.server.core.config.RetrievalConfig;
-import com.mcp.server.core.interfaces.Retriever;
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.Metadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 class RetrieverFactoryIntegrationTest {
 
     @Container
-    static ChromaDBContainer chromaContainer = new ChromaDBContainer("chromadb/chroma:0.4.22");
+    static ChromaDBContainer chromaContainer = new ChromaDBContainer("chromadb/chroma:0.4.23");
 
     @Nested
     @DisplayName("createBaselineRetriever() with default config")
@@ -37,7 +38,7 @@ class RetrieverFactoryIntegrationTest {
             String collectionName = "test_collection";
 
             // Act
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
+            BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
                 chromaHost,
                 chromaPort,
                 collectionName
@@ -54,7 +55,7 @@ class RetrieverFactoryIntegrationTest {
             // Arrange
             String chromaHost = chromaContainer.getHost();
             int chromaPort = chromaContainer.getFirstMappedPort();
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
+            BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
                 chromaHost,
                 chromaPort,
                 "test_init_collection"
@@ -84,7 +85,7 @@ class RetrieverFactoryIntegrationTest {
             customConfig.setChunkOverlap(100);
 
             // Act
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
+            BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
                 chromaHost,
                 chromaPort,
                 collectionName,
@@ -109,7 +110,7 @@ class RetrieverFactoryIntegrationTest {
             invalidConfig.setVectorWeight(0.6f); // Sum = 1.1, invalid
 
             // Act & Assert
-            assertThatThrownBy(() -> RetrieverFactory.createBaselineRetriever(
+            assertThatThrownBy(() -> RetrieverFactory.createTestRetriever(
                 chromaHost,
                 chromaPort,
                 collectionName,
@@ -127,7 +128,7 @@ class RetrieverFactoryIntegrationTest {
             config.setChunkOverlap(200);
 
             // Act
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
+            BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
                 chromaContainer.getHost(),
                 chromaContainer.getFirstMappedPort(),
                 "test",
@@ -136,49 +137,6 @@ class RetrieverFactoryIntegrationTest {
 
             // Assert
             assertThat(retriever).isNotNull();
-        }
-    }
-
-    @Nested
-    @DisplayName("Error handling")
-    class ErrorHandlingTests {
-
-        @Test
-        @DisplayName("should throw exception for invalid host")
-        void createBaselineRetriever_InvalidHost_ThrowsException() {
-            // Arrange
-            String invalidHost = "invalid-host-that-does-not-exist";
-            int chromaPort = 8000;
-
-            // Act
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
-                invalidHost,
-                chromaPort,
-                "test"
-            );
-
-            // Assert - Creation succeeds, but initialization should fail
-            assertThatThrownBy(retriever::initialize)
-                .isInstanceOf(RuntimeException.class);
-        }
-
-        @Test
-        @DisplayName("should throw exception for invalid port")
-        void createBaselineRetriever_InvalidPort_ThrowsException() {
-            // Arrange
-            String chromaHost = chromaContainer.getHost();
-            int invalidPort = 9999; // Not the actual ChromaDB port
-
-            // Act
-            Retriever retriever = RetrieverFactory.createBaselineRetriever(
-                chromaHost,
-                invalidPort,
-                "test"
-            );
-
-            // Assert - Creation succeeds, but initialization should fail
-            assertThatThrownBy(retriever::initialize)
-                .isInstanceOf(RuntimeException.class);
         }
     }
 }

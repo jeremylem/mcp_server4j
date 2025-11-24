@@ -4,8 +4,6 @@ import com.mcp.server.core.config.IngestConfig;
 import com.mcp.server.ingest.api.VectorStore;
 import com.mcp.server.ingest.exception.VectorStoreException;
 import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.DocumentSplitter;
-import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
@@ -15,7 +13,6 @@ import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -92,34 +89,44 @@ public class ChromaVectorStore implements VectorStore {
         logger.info("Adding {} pre-chunked documents to vector store (this may take a while)...", documents.size());
 
         try {
-            // Documents are already chunked by the pipeline
-            // Process in batches to avoid ChromaDB's batch size limit
-            int totalChunks = documents.size();
-            int batchCount = (int) Math.ceil((double) totalChunks / BATCH_SIZE);
-
-            logger.info("Processing {} chunks in {} batch(es)...", totalChunks, batchCount);
-
-            for (int i = 0; i < totalChunks; i += BATCH_SIZE) {
-                int end = Math.min(i + BATCH_SIZE, totalChunks);
-                List<Document> batch = documents.subList(i, end);
-
-                int batchNum = (i / BATCH_SIZE) + 1;
-                logger.info("Processing batch {}/{}: {} chunks", batchNum, batchCount, batch.size());
-
-                // Use ingestor for each batch (embeds and stores properly)
-                EmbeddingStoreIngestor batchIngestor = EmbeddingStoreIngestor.builder()
-                    .embeddingModel(embeddingModel)
-                    .embeddingStore(embeddingStore)
-                    .build();
-
-                batchIngestor.ingest(batch);
-            }
-
-            logger.info("Successfully added {} chunks to vector store", totalChunks);
-
+            processBatches(documents);
+            logger.info("Successfully added {} chunks to vector store", documents.size());
         } catch (Exception e) {
             throw new VectorStoreException("Failed to add documents to vector store", e);
         }
+    }
+
+    private void processBatches(List<Document> documents) {
+        int totalChunks = documents.size();
+        int batchCount = calculateBatchCount(totalChunks);
+
+        logger.info("Processing {} chunks in {} batch(es)...", totalChunks, batchCount);
+
+        for (int i = 0; i < totalChunks; i += BATCH_SIZE) {
+            processBatch(documents, i, totalChunks);
+        }
+    }
+
+    private int calculateBatchCount(int totalChunks) {
+        return (int) Math.ceil((double) totalChunks / BATCH_SIZE);
+    }
+
+    private void processBatch(List<Document> documents, int startIndex, int totalChunks) {
+        int end = Math.min(startIndex + BATCH_SIZE, totalChunks);
+        List<Document> batch = documents.subList(startIndex, end);
+
+        int batchNum = (startIndex / BATCH_SIZE) + 1;
+        logger.info("Processing batch {}: {} chunks", batchNum, batch.size());
+
+        EmbeddingStoreIngestor batchIngestor = createBatchIngestor();
+        batchIngestor.ingest(batch);
+    }
+
+    private EmbeddingStoreIngestor createBatchIngestor() {
+        return EmbeddingStoreIngestor.builder()
+            .embeddingModel(embeddingModel)
+            .embeddingStore(embeddingStore)
+            .build();
     }
 
     @Override

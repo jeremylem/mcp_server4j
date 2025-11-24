@@ -1,5 +1,8 @@
 package com.mcp.server.mcp.models;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.Map;
 
 /**
@@ -10,6 +13,8 @@ import java.util.Map;
  * - metadata: Source file, type, and other metadata
  * - confidence: Hybrid search score (0.0 to 1.0)
  */
+@Setter
+@Getter
 public class KnowledgeBaseDocument {
 
     private String content;
@@ -25,27 +30,4 @@ public class KnowledgeBaseDocument {
         this.confidence = confidence;
     }
 
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public Map<String, String> getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(Map<String, String> metadata) {
-        this.metadata = metadata;
-    }
-
-    public double getConfidence() {
-        return confidence;
-    }
-
-    public void setConfidence(double confidence) {
-        this.confidence = confidence;
-    }
 }

@@ -9,7 +9,6 @@ import java.util.Map;
 
 /**
  * Result from a knowledge base query.
- *
  * Contains the retrieved content, metadata, and confidence score.
  */
 @Data

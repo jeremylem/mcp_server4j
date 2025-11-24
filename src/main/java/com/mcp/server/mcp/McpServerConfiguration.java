@@ -2,9 +2,7 @@ package com.mcp.server.mcp;
 
 import com.mcp.server.core.config.RetrievalConfig;
 import com.mcp.server.core.interfaces.DocumentManager;
-import com.mcp.server.core.interfaces.Initializable;
 import com.mcp.server.core.interfaces.QueryService;
-import com.mcp.server.core.interfaces.Retriever;
 import com.mcp.server.ingest.api.DocumentChunker;
 import com.mcp.server.ingest.chunker.RecursiveDocumentChunker;
 import com.mcp.server.ingest.indexer.LuceneBM25Indexer;
@@ -38,6 +36,7 @@ import java.nio.file.Paths;
  * - Retriever (orchestrates hybrid search)
  */
 @Configuration
+@org.springframework.context.annotation.Profile("!test")
 public class McpServerConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(McpServerConfiguration.class);
@@ -134,15 +133,9 @@ public class McpServerConfiguration {
                 config
         );
 
-        // Initialize the retriever (builds BM25 index from ChromaDB)
-        try {
-            logger.info("Initializing retriever (building BM25 index from ChromaDB)...");
-            retriever.initialize();
-            logger.info("Retriever initialized successfully");
-        } catch (Exception e) {
-            logger.warn("WARNING: Could not initialize retriever (ChromaDB might be empty): {}", e.getMessage());
-            logger.info("Retriever will work once documents are ingested");
-        }
+        // Note: initialize() is not called here to avoid issues in tests
+        // The application should call initialize() explicitly when needed
+        logger.info("BaselineRetriever bean created (call initialize() to load persisted index)");
 
         return retriever;
     }
@@ -177,12 +170,21 @@ public class McpServerConfiguration {
     }
 
     /**
-     * Provide Retriever interface for backward compatibility.
-     * @deprecated Use focused interfaces (QueryService, DocumentManager, DocumentChunker) instead.
+     * Initialize the retriever on application startup.
+     * Loads the persisted BM25 index from disk.
      */
-    @Deprecated
     @Bean
-    public Retriever retriever(BaselineRetriever baselineRetriever) {
-        return baselineRetriever;
+    public org.springframework.boot.ApplicationRunner initializeRetriever(BaselineRetriever retriever) {
+        return args -> {
+            logger.info("Initializing BaselineRetriever (loading BM25 index from disk)...");
+            try {
+                retriever.initialize();
+                logger.info("BaselineRetriever initialized successfully");
+            } catch (Exception e) {
+                logger.error("Failed to initialize BaselineRetriever: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to initialize retriever", e);
+            }
+        };
     }
+
 }

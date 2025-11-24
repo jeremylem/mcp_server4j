@@ -84,7 +84,7 @@ public class BM25SearchResult {
         int result = id != null ? id.hashCode() : 0;
         result = 31 * result + (content != null ? content.hashCode() : 0);
         result = 31 * result + (filename != null ? filename.hashCode() : 0);
-        result = 31 * result + (score != +0.0f ? Float.floatToIntBits(score) : 0);
+        result = 31 * result + (score != 0.0f ? Float.floatToIntBits(score) : 0);
         return result;
     }
 }

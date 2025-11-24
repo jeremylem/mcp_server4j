@@ -1,25 +1,26 @@
-# MCP Server 4J - Local Knowledge Base (Java)
+# MCP Server 4J - Local Knowledge Base
 
-A Java implementation of a local knowledge base system using the Model Context Protocol (MCP). This project enables AI assistants to intelligently access and query your documents using hybrid search (BM25 + Vector similarity).
+Java implementation of a local knowledge base using the Model Context Protocol (MCP). Query your documents with hybrid search (BM25 + vector similarity).
 
-## Key Features
+## Features
 
-- **Hybrid Search**: Combines BM25 keyword matching with vector semantic similarity
-- **SOLID Architecture**: Clean separation of concerns with focused interfaces
-- **Spring Boot**: Enterprise-grade dependency injection and configuration
-- **Persistent Storage**: BM25 index and ChromaDB vector storage survive restarts
-- **MCP Protocol**: Compatible with MCP-enabled AI assistants like Claude Code
-- **Multi-format Support**: PDF, Markdown, TXT, and more via Apache Tika
+- Hybrid search (BM25 keyword + vector semantic similarity)
+- SOLID architecture with interface-driven design
+- Spring Boot dependency injection
+- Persistent BM25 index + ChromaDB vector storage
+- MCP protocol support
+- Multi-format: PDF, Markdown, TXT via Apache Tika
 
 ## Quick Start
 
 ### Prerequisites
+
 - Docker and Docker Compose
 - Java 17+ (for local development)
 - Maven 3.8+ (for local development)
 
-### 1. Add Your Documents
-Place your documents in the `documents/` directory:
+### 1. Add Documents
+
 ```bash
 documents/
 ├── mybook.pdf
@@ -28,21 +29,22 @@ documents/
 ```
 
 ### 2. Start Services
+
 ```bash
 docker-compose up -d
+# ChromaDB: port 8000
+# MCP Server: port 8001
 ```
 
-This starts:
-- ChromaDB on port 8000 (vector database)
-- MCP Server on port 8001 (query API)
-
 ### 3. Ingest Documents
+
 ```bash
 docker-compose run --rm -v "$(pwd)/documents:/docs" mcp-server ingest \
   --docs_dir "/docs" --chroma-host chroma --chroma-port 8000
 ```
 
 ### 4. Query Your Knowledge Base
+
 ```bash
 curl -X POST http://localhost:8001/api/query \
   -H "Content-Type: application/json" \
@@ -55,93 +57,62 @@ curl -X POST http://localhost:8001/api/query \
 
 ## Architecture
 
-### Core Components
+**Ingestion** (`com.mcp.server.ingest`)
 
-**Ingestion Pipeline** (`com.mcp.server.ingest`)
-- **MultiFormatDocumentLoader**: Loads PDF, Markdown, TXT files via Apache Tika
-- **RecursiveDocumentChunker**: Splits documents into chunks (512 chars, 50 overlap)
-- **ChromaVectorStore**: Stores embeddings using all-MiniLM-L6-v2 model
-- **LuceneBM25Indexer**: Builds persistent BM25 keyword index
+- MultiFormatDocumentLoader - Loads PDF, Markdown, TXT via Apache Tika
+- RecursiveDocumentChunker - Splits into 512-char chunks, 50 overlap
+- ChromaVectorStore - Embeddings via all-MiniLM-L6-v2
+- LuceneBM25Indexer - Persistent BM25 keyword index
 
-**Retrieval System** (`com.mcp.server.retrieval`)
-- **BaselineRetriever**: Orchestrates hybrid search
-- **ChromaVectorSearch**: Semantic search via LangChain4j
-- **HybridScoreFusion**: Combines BM25 + Vector scores (30% + 70% default)
-- **QueryController**: REST API for queries
+**Retrieval** (`com.mcp.server.retrieval`)
 
-**Configuration** (`com.mcp.server.core.config`)
-- **IngestConfig**: Chunking parameters, document paths
-- **RetrievalConfig**: Fusion weights, candidate pool size
-- **McpServerConfiguration**: Spring beans and dependency injection
+- BaselineRetriever - Hybrid search orchestration
+- ChromaVectorSearch - Semantic search via LangChain4j
+- HybridScoreFusion - 30% BM25 + 70% Vector (default)
+- QueryController - REST API
 
-### SOLID Principles
+**Config** (`com.mcp.server.core.config`)
 
-The codebase follows Interface Segregation Principle with focused interfaces:
-- **QueryService**: Query operations only
-- **DocumentManager**: Document addition/management
-- **DocumentChunker**: Document chunking
-- **Initializable**: Initialization logic
+- IngestConfig - Chunking params
+- RetrievalConfig - Fusion weights
+- McpServerConfiguration - Spring beans
 
-Components depend only on the interfaces they need, not on composite interfaces.
+Core interfaces: QueryService, DocumentManager, DocumentChunker, Initializable
 
 ## Differences from Python Version
 
-| Aspect | Python Version | Java Version |
-|--------|---------------|--------------|
-| **Language** | Python 3.11 | Java 17 |
-| **Framework** | FastMCP + FastAPI | Spring Boot + MCP protocol |
-| **DI Container** | Manual wiring | Spring IoC container |
-| **Architecture** | Simple functions | SOLID-based classes with interfaces |
-| **BM25 Library** | rank-bm25 (in-memory) | Apache Lucene (persistent) |
-| **Vector Store** | ChromaDB Python client | LangChain4j ChromaDB integration |
-| **Embedding Model** | Sentence Transformers | LangChain4j ONNX (all-MiniLM-L6-v2) |
-| **Document Loading** | LangChain Python loaders | Apache Tika (universal) |
-| **Chunking** | LangChain RecursiveCharacterTextSplitter | LangChain4j DocumentSplitters.recursive() |
-| **Configuration** | Hardcoded constants | Externalized config classes |
-| **Testing** | pytest | JUnit 5 |
-| **Persistence** | In-memory BM25, ChromaDB volume | Persistent BM25 index + ChromaDB |
-| **Code Size** | ~200 lines | ~2000 lines (enterprise patterns) |
-| **Startup** | Single script | Docker entrypoint with dual modes |
+| Aspect               | Python Version                           | Java Version                              |
+| -------------------- | ---------------------------------------- | ----------------------------------------- |
+| **Language**         | Python 3.11                              | Java 21                                   |
+| **Framework**        | FastMCP + FastAPI                        | Spring Boot + MCP protocol                |
+| **DI Container**     | Manual wiring                            | Spring IoC container                      |
+| **Architecture**     | Simple functions                         | SOLID-based classes with interfaces       |
+| **BM25 Library**     | rank-bm25 (in-memory)                    | Apache Lucene (persistent)                |
+| **Vector Store**     | ChromaDB Python client                   | LangChain4j ChromaDB integration          |
+| **Embedding Model**  | Sentence Transformers                    | LangChain4j ONNX (all-MiniLM-L6-v2)       |
+| **Document Loading** | LangChain Python loaders                 | Apache Tika (universal)                   |
+| **Chunking**         | LangChain RecursiveCharacterTextSplitter | LangChain4j DocumentSplitters.recursive() |
+| **Configuration**    | Hardcoded constants                      | Externalized config classes               |
+| **Testing**          | pytest                                   | JUnit 5                                   |
+| **Persistence**      | In-memory BM25, ChromaDB volume          | Persistent BM25 index + ChromaDB          |
+| **Code Size**        | ~200 lines                               | ~2000 lines (enterprise patterns)         |
+| **Startup**          | Single script                            | Docker entrypoint with dual modes         |
 
 ### Why Java?
 
-**Advantages of Java Implementation:**
-1. **Enterprise Ready**: Spring Boot ecosystem, dependency injection, externalized config
-2. **Type Safety**: Compile-time checks prevent runtime errors
-3. **Performance**: Native BM25 implementation via Lucene, ONNX-based embeddings
-4. **Persistence**: BM25 index survives restarts (Python version rebuilds on startup)
-5. **Scalability**: Thread-safe components, connection pooling, production patterns
-6. **Maintainability**: SOLID architecture, clear interfaces, separation of concerns
-7. **IDE Support**: Better refactoring, autocomplete, debugging
-8. **Universal Document Support**: Apache Tika handles 1000+ file formats
+Advantages:
 
-**Tradeoffs:**
-- More verbose code (~10x larger codebase)
-- Longer development time for new features
-- Higher memory footprint (~500MB vs ~200MB)
-- More complex build process (Maven vs pip)
+- Type safety and compile-time checks
+- Spring Boot DI and externalized config
+- Lucene native BM25, ONNX embeddings
+- Better IDE support for refactoring
 
-### Key Architectural Improvements
+Tradeoffs:
 
-**1. Persistent BM25 Index**
-- Python: Rebuilt on every server start from ChromaDB
-- Java: Saved to disk at `/data/lucene_bm25`, loaded instantly on startup
-
-**2. Dependency Injection**
-- Python: Manual object creation in scripts
-- Java: Spring manages lifecycle and dependencies
-
-**3. Configuration Management**
-- Python: Hardcoded constants in `retrieval.py`
-- Java: `IngestConfig` and `RetrievalConfig` classes with validation
-
-**4. Error Handling**
-- Python: Basic try/catch blocks
-- Java: Custom exception hierarchy (`VectorStoreException`, `IndexingException`, etc.)
-
-**5. Extensibility**
-- Python: Add functions, modify classes directly
-- Java: Implement interfaces, extend abstract classes, use factories
+- More verbose (~10x code size)
+- Slower development
+- Higher memory (~500MB vs ~200MB)
+- Maven vs pip complexity
 
 ## Configuration
 
@@ -188,8 +159,6 @@ mvn clean package
 # Run tests
 mvn test
 
-# Skip tests
-mvn clean package -DskipTests
 ```
 
 ### Docker Build
@@ -216,41 +185,6 @@ java -jar target/mcp-server-1.0.0.jar ingest \
 
 # Run MCP server
 java -jar target/mcp-server-1.0.0.jar
-```
-
-## Project Structure
-
-```
-mcp_server4j/
-├── src/
-│   ├── main/java/com/mcp/server/
-│   │   ├── core/              # Interfaces and configuration
-│   │   │   ├── config/        # IngestConfig, RetrievalConfig
-│   │   │   ├── interfaces/    # QueryService, DocumentManager, etc.
-│   │   │   └── models/        # SearchResult, VectorSearchResult
-│   │   ├── ingest/            # Document ingestion pipeline
-│   │   │   ├── api/           # VectorStore, KeywordIndexer interfaces
-│   │   │   ├── chunker/       # RecursiveDocumentChunker
-│   │   │   ├── cli/           # IngestCLI entry point
-│   │   │   ├── indexer/       # LuceneBM25Indexer
-│   │   │   ├── loader/        # MultiFormatDocumentLoader
-│   │   │   ├── pipeline/      # DocumentIngestionPipeline
-│   │   │   └── store/         # ChromaVectorStore
-│   │   ├── mcp/               # MCP server and REST API
-│   │   │   ├── McpServerConfiguration.java
-│   │   │   ├── QueryController.java
-│   │   │   └── McpServerApplication.java
-│   │   └── retrieval/         # Hybrid search implementation
-│   │       ├── BaselineRetriever.java
-│   │       ├── ChromaVectorSearch.java
-│   │       └── HybridScoreFusion.java
-│   └── test/java/             # JUnit tests
-├── data/                      # Persistent BM25 index
-├── chroma_db/                 # ChromaDB volume
-├── documents/                 # Your documents
-├── pom.xml                    # Maven dependencies
-├── Dockerfile                 # Multi-stage build
-└── docker-compose.yml         # Services orchestration
 ```
 
 ## Troubleshooting
@@ -299,21 +233,17 @@ ENTRYPOINT ["java", "-Xmx1g", "-jar", "app.jar"]
 
 ## Performance
 
-Typical performance on test corpus (29 markdown files, 873 chunks):
+Test corpus (29 markdown files, 873 chunks):
 
-- **Ingestion**: ~30 seconds for 873 chunks
-- **Query Latency**: ~20-30ms average
-- **Accuracy**: 100% R@5 on test queries
-- **Memory**: ~500MB Java heap + ChromaDB
+- Ingestion: ~30 seconds
+- Query: ~20-30ms average
+- Accuracy: 100% R@5
+- Memory: ~500MB Java heap + ChromaDB
 
 ## References
 
 - [Model Context Protocol](https://github.com/anthropics/mcp)
-- [Spring Boot Documentation](https://spring.io/projects/spring-boot)
-- [LangChain4j Documentation](https://docs.langchain4j.dev)
+- [Spring Boot](https://spring.io/projects/spring-boot)
+- [LangChain4j](https://docs.langchain4j.dev)
 - [Apache Lucene](https://lucene.apache.org/)
 - [ChromaDB](https://docs.trychroma.com/)
-
-## License
-
-MIT License - see original Python version for details.

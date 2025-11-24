@@ -1,7 +1,7 @@
 package com.mcp.server.mcp;
 
 import com.mcp.server.core.config.RetrievalConfig;
-import com.mcp.server.core.interfaces.Retriever;
+
 import com.mcp.server.ingest.api.DocumentChunker;
 import com.mcp.server.ingest.chunker.RecursiveDocumentChunker;
 import com.mcp.server.ingest.indexer.LuceneBM25Indexer;
@@ -12,6 +12,7 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -19,30 +20,39 @@ import org.springframework.context.annotation.Primary;
 /**
  * Test configuration for MCP Server integration tests.
  *
- * Provides in-memory implementations and test doubles for:
+ * Provides test implementations for:
  * - Retriever (BaselineRetriever)
- * - ChromaDB (in-memory test store)
- * - BM25 indexer
+ * - ChromaDB (connected via TestContainers)
+ * - Test embedding model (fast random vectors)
+ * - BM25 indexer (in-memory)
  * - Document chunker
+ *
+ * Uses @DynamicPropertySource from the test to connect to TestContainers ChromaDB.
  */
 @TestConfiguration
 public class McpServerTestConfig {
 
-    @Bean
-    @Primary
-    public Retriever testRetriever() {
+    @Value("${chroma.host:localhost}")
+    private String chromaHost;
+
+    @Value("${chroma.port:8000}")
+    private int chromaPort;
+
+    @Bean("baselineRetriever")
+    public BaselineRetriever baselineRetriever() {
         // Create test configuration
         RetrievalConfig config = new RetrievalConfig();
         config.setBm25Weight(0.3f);
         config.setVectorWeight(0.7f);
         config.setCandidatePoolSize(20);
 
-        // Create in-memory embedding model for testing
+        // Create test embedding model (uses random vectors for fast testing)
         EmbeddingModel embeddingModel = new TestEmbeddingModel();
 
-        // Create in-memory ChromaDB store
+        // Create ChromaDB store connected to TestContainers instance
+        String baseUrl = String.format("http://%s:%d", chromaHost, chromaPort);
         ChromaEmbeddingStore embeddingStore = ChromaEmbeddingStore.builder()
-                .baseUrl("http://localhost:8000")
+                .baseUrl(baseUrl)
                 .collectionName("test_kb")
                 .build();
 
@@ -63,17 +73,51 @@ public class McpServerTestConfig {
     }
 
     /**
-     * Simple test embedding model that returns fixed-size vectors.
-     * For real testing, you'd want to use the actual embedding model.
+     * Override the queryService bean from main configuration to use test retriever.
+     */
+    @Bean("queryService")
+    @Primary
+    public com.mcp.server.core.interfaces.QueryService queryService() {
+        return baselineRetriever();
+    }
+
+    /**
+     * Override the documentManager bean from main configuration to use test retriever.
+     */
+    @Bean("documentManager")
+    public com.mcp.server.core.interfaces.DocumentManager documentManager() {
+        return baselineRetriever();
+    }
+
+    /**
+     * Simple test embedding model that returns deterministic fixed-size vectors.
+     * Uses text hash to ensure consistent vectors for the same text.
      */
     private static class TestEmbeddingModel implements EmbeddingModel {
         @Override
         public Response<Embedding> embed(String text) {
-            // Return a simple fixed-size embedding for testing
+            // Return deterministic embedding based on text hash
+            // This ensures same text always gets same vector (critical for search to work!)
             float[] vector = new float[384]; // all-MiniLM-L6-v2 size
+
+            // Use text hash as seed for deterministic random generation
+            int hash = text.hashCode();
+            java.util.Random random = new java.util.Random(hash);
+
             for (int i = 0; i < vector.length; i++) {
-                vector[i] = (float) Math.random();
+                vector[i] = random.nextFloat();
             }
+
+            // Normalize vector (important for cosine similarity)
+            float norm = 0;
+            for (float v : vector) {
+                norm += v * v;
+            }
+            norm = (float) Math.sqrt(norm);
+            for (int i = 0; i < vector.length; i++) {
+                vector[i] /= norm;
+            }
+
             return Response.from(Embedding.from(vector));
         }
 

@@ -8,7 +8,6 @@ import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingStore;
-import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,36 +90,35 @@ public class ChromaVectorSearch {
     public List<Document> getAllDocuments() {
         logger.info("Fetching all documents from ChromaDB...");
 
-        // Note: This is a workaround since LangChain4j doesn't provide a direct "getAll" method
-        // We search with a very generic query and high topK to get all documents
-        // In production, consider using ChromaDB client directly for better control
-
         try {
-            // Dummy embedding for retrieval (use a generic query instead of empty string)
-            Embedding dummyEmbedding = embeddingModel.embed("document").content();
-
-            EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
-                    .queryEmbedding(dummyEmbedding)
-                    .maxResults(100000) // Very large number to get all documents (increased from 10000)
-                    .minScore(0.0) // Accept all scores
-                    .build();
-
+            EmbeddingSearchRequest request = createGetAllRequest();
             List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(request).matches();
-
-            List<Document> documents = new ArrayList<>();
-            for (EmbeddingMatch<TextSegment> match : matches) {
-                TextSegment segment = match.embedded();
-                Document doc = Document.from(segment.text(), segment.metadata());
-                documents.add(doc);
-            }
+            List<Document> documents = convertMatchesToDocuments(matches);
 
             logger.info("Fetched {} documents from ChromaDB", documents.size());
             return documents;
-
         } catch (Exception e) {
             logger.error("Failed to fetch documents from ChromaDB", e);
             throw new RuntimeException("Failed to fetch documents from ChromaDB", e);
         }
+    }
+
+    private EmbeddingSearchRequest createGetAllRequest() {
+        Embedding dummyEmbedding = embeddingModel.embed("document").content();
+        return EmbeddingSearchRequest.builder()
+                .queryEmbedding(dummyEmbedding)
+                .maxResults(100000)
+                .minScore(0.0)
+                .build();
+    }
+
+    private List<Document> convertMatchesToDocuments(List<EmbeddingMatch<TextSegment>> matches) {
+        List<Document> documents = new ArrayList<>();
+        for (EmbeddingMatch<TextSegment> match : matches) {
+            TextSegment segment = match.embedded();
+            documents.add(Document.from(segment.text(), segment.metadata()));
+        }
+        return documents;
     }
 
     /**
@@ -132,28 +130,31 @@ public class ChromaVectorSearch {
         logger.info("Adding {} documents to vector store...", documents.size());
 
         try {
-            List<TextSegment> segments = new ArrayList<>();
-            List<Embedding> embeddings = new ArrayList<>();
-
-            for (Document doc : documents) {
-                // Convert Document to TextSegment
-                TextSegment segment = TextSegment.from(doc.text(), doc.metadata());
-                segments.add(segment);
-
-                // Generate embedding
-                Embedding embedding = embeddingModel.embed(doc.text()).content();
-                embeddings.add(embedding);
-            }
-
-            // Add to store
+            List<TextSegment> segments = convertToSegments(documents);
+            List<Embedding> embeddings = generateEmbeddings(documents);
             embeddingStore.addAll(embeddings, segments);
 
             logger.info("Added {} documents to vector store", documents.size());
-
         } catch (Exception e) {
             logger.error("Failed to add documents to vector store", e);
             throw new RuntimeException("Failed to add documents to vector store", e);
         }
+    }
+
+    private List<TextSegment> convertToSegments(List<Document> documents) {
+        List<TextSegment> segments = new ArrayList<>();
+        for (Document doc : documents) {
+            segments.add(TextSegment.from(doc.text(), doc.metadata()));
+        }
+        return segments;
+    }
+
+    private List<Embedding> generateEmbeddings(List<Document> documents) {
+        List<Embedding> embeddings = new ArrayList<>();
+        for (Document doc : documents) {
+            embeddings.add(embeddingModel.embed(doc.text()).content());
+        }
+        return embeddings;
     }
 
     /**
