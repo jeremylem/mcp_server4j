@@ -11,9 +11,6 @@ import java.util.Map;
 
 /**
  * REST endpoint for querying the knowledge base.
- * <p>
- * Uses QueryService interface (ISP-compliant) instead of composite Retriever.
- * This controller only needs query capabilities, not document management.
  */
 @RestController
 @RequestMapping("/api")
@@ -44,13 +41,11 @@ public class QueryController {
             Integer topK,
             Boolean useHybrid,
             String filterType
-    ) {
-    }
+    ) {}
 
     public record QueryResponse(
             String query,
             int resultCount,
             List<Map<String, Object>> results
-    ) {
-    }
+    ) {}
 }

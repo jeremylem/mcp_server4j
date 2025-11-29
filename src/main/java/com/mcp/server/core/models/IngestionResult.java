@@ -8,5 +8,4 @@ public record IngestionResult(
         int chunksCreated,
         int totalInCollection,
         String collectionName
-) {
-}
+) {}

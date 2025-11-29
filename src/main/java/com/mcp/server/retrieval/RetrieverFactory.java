@@ -42,39 +42,18 @@ public class RetrieverFactory {
         }
     }
 
-    /**
-     * Create a BaselineRetriever for testing with in-memory BM25 indexer.
-     * Uses a temporary directory for the BM25 index that doesn't require /data access.
-     *
-     * @param chromaHost     ChromaDB host
-     * @param chromaPort     ChromaDB port
-     * @param collectionName Collection name
-     * @return Configured BaselineRetriever for testing
-     */
     public static BaselineRetriever createTestRetriever(
             String chromaHost,
             int chromaPort,
-            String collectionName
-    ) {
+            String collectionName) {
         return createTestRetriever(chromaHost, chromaPort, collectionName, new RetrievalConfig());
     }
 
-    /**
-     * Create a BaselineRetriever for testing with in-memory BM25 indexer and custom config.
-     * Uses a temporary directory for the BM25 index that doesn't require /data access.
-     *
-     * @param chromaHost     ChromaDB host
-     * @param chromaPort     ChromaDB port
-     * @param collectionName Collection name
-     * @param config         Retrieval configuration
-     * @return Configured BaselineRetriever for testing
-     */
     public static BaselineRetriever createTestRetriever(
             String chromaHost,
             int chromaPort,
             String collectionName,
-            RetrievalConfig config
-    ) {
+            RetrievalConfig config) {
         logger.info("Creating BaselineRetriever for testing...");
         logger.info("  ChromaDB: {}:{}", chromaHost, chromaPort);
         logger.info("  Collection: {}", collectionName);

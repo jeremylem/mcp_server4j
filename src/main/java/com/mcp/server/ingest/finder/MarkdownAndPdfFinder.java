@@ -17,8 +17,6 @@ import java.util.stream.Stream;
  * <p>
  * Filtering rules:
  * - Includes: *.md and *.pdf files
- * - Excludes: README.md and CLAUDE.md in root directory
- * - Includes: README.md and CLAUDE.md in subdirectories of documents/
  */
 public class MarkdownAndPdfFinder implements DocumentFinder {
 
@@ -47,7 +45,6 @@ public class MarkdownAndPdfFinder implements DocumentFinder {
                             if (!filename.equals("README.md") && !filename.equals("CLAUDE.md")) {
                                 mdFiles.add(path);
                             } else if (path.toString().contains("documents")) {
-                                // Include README/CLAUDE if they're in documents/ subdirectory
                                 mdFiles.add(path);
                             }
                         }

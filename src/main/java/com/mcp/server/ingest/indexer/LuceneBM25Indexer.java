@@ -31,7 +31,6 @@ import java.util.List;
 /**
  * BM25 keyword indexer using Apache Lucene.
  * <p>
- * Implements KeywordIndexer interface for SOLID compliance.
  * Supports both in-memory (ByteBuffersDirectory) and persistent (FSDirectory) storage.
  * <p>
  * BM25 Parameters:
