@@ -5,12 +5,10 @@ search (BM25 + vector similarity).
 
 ## Features
 
-- **Hybrid search**: BM25 keyword + vector semantic similarity
-- **Interface-driven design**: Clean separation of concerns with QueryService, DocumentManager
-- **Spring Boot**: Dependency injection and configuration management
-- **Persistent storage**: BM25 index + ChromaDB vector store
-- **MCP protocol**: Query via JSON-RPC or REST API
-- **Multi-format support**: PDF, Markdown, TXT via Apache Tika + PDFBox
+- **Hybrid search**: BM25 keyword + vector semantic similarity (30% + 70% weights)
+- **Dual storage**: In-memory Lucene BM25 + ChromaDB vector store
+- **MCP protocol**: Model Context Protocol server implementation
+- **Multi-format support**: PDF, Markdown, TXT via Apache Tika
 
 ## Quick Start
 
@@ -78,20 +76,19 @@ curl -X POST http://localhost:8001/api/query \
   }'
 ```
 
-## Architecture
-
 ### Ingestion Pipeline
 
 ```
-Documents → MultiFormatLoader → Chunker → BM25 Index + Vector Store
+Documents → Finder → Loader → Chunker → BM25 Index + Vector Store
 ```
 
 **Key Components:**
 
+- `RecursiveDocumentFinder` - Recursively find documents in directory
 - `MultiFormatDocumentLoader` - PDF, Markdown, TXT via Apache Tika
 - `RecursiveDocumentChunker` - 512-char chunks, 50-char overlap
-- `LuceneBM25Indexer` - Persistent keyword index
-- `ChromaVectorStore` - Embeddings via all-MiniLM-L6-v2
+- `LuceneBM25Indexer` - In-memory keyword index (Apache Lucene)
+- `ChromaVectorSearch` - Embeddings via all-MiniLM-L6-v2
 
 ### Retrieval Pipeline
 
@@ -101,18 +98,18 @@ Query → BM25 Search + Vector Search → Score Fusion → Ranked Results
 
 **Key Components:**
 
-- `BaselineRetriever` - Orchestrates hybrid search
+- `BaselineRetriever` - Orchestrates hybrid search (30% BM25 + 70% vector)
+- `LuceneBM25Indexer` - BM25 keyword search with Lucene
 - `ChromaVectorSearch` - Semantic similarity via LangChain4j
-- `HybridScoreFusion` - Weighted combination (default: 30% BM25 + 70% vector)
+- `HybridScoreFusion` - Weighted score combination and normalization
 - `KnowledgeBaseTool` - MCP protocol interface
-- `QueryController` - REST API endpoint
 
 ### Core Interfaces
 
-- `QueryService` - Search operations
-- `DocumentManager` - Document ingestion
-- `DocumentChunker` - Text splitting
-- `Initializable` - Lifecycle management
+- `KeywordIndexer` - BM25 indexing and search operations
+- `DocumentLoader` - Multi-format document parsing
+- `DocumentChunker` - Text splitting strategies
+- `IngestionPipeline` - End-to-end ingestion workflow
 
 ## Differences from Python Version
 
@@ -121,17 +118,14 @@ Query → BM25 Search + Vector Search → Score Fusion → Ranked Results
 | **Language**         | Python 3.11                              | Java 21                                   |
 | **Framework**        | FastMCP + FastAPI                        | Spring Boot + MCP protocol                |
 | **DI Container**     | Manual wiring                            | Spring IoC container                      |
-| **Architecture**     | Simple functions                         | SOLID-based classes with interfaces       |
-| **BM25 Library**     | rank-bm25 (in-memory)                    | Apache Lucene (persistent)                |
+| **BM25 Library**     | rank-bm25 (in-memory)                    | Apache Lucene (in-memory)                 |
 | **Vector Store**     | ChromaDB Python client                   | LangChain4j ChromaDB integration          |
 | **Embedding Model**  | Sentence Transformers                    | LangChain4j ONNX (all-MiniLM-L6-v2)       |
 | **Document Loading** | LangChain Python loaders                 | Apache Tika (universal)                   |
 | **Chunking**         | LangChain RecursiveCharacterTextSplitter | LangChain4j DocumentSplitters.recursive() |
 | **Configuration**    | Hardcoded constants                      | Externalized config classes               |
-| **Testing**          | pytest                                   | JUnit 5                                   |
-| **Persistence**      | In-memory BM25, ChromaDB volume          | Persistent BM25 index + ChromaDB          |
-| **Code Size**        | ~200 lines                               | ~2000 lines (enterprise patterns)         |
-| **Startup**          | Single script                            | Docker entrypoint with dual modes         |
+| **Persistence**      | In-memory BM25, ChromaDB volume          | In-memory BM25, ChromaDB volume           |
+| **Code Size**        | ~200 lines                               | ~2000 lines                               |   
 
 ### Why Java?
 
@@ -139,17 +133,13 @@ Query → BM25 Search + Vector Search → Score Fusion → Ranked Results
 
 - Strong type safety and compile-time error detection
 - Spring Boot ecosystem (DI, config management, testing)
-- Native Lucene BM25 with persistent indexes
+- Native Lucene BM25 implementation (no external BM25 library needed)
 - ONNX runtime for embeddings (no Python dependencies)
-- Enterprise-grade tooling and IDE support
-- Clear interfaces and testability
 
 **Tradeoffs:**
 
 - More verbose (~10x code size vs Python)
-- Longer development cycles
 - Higher memory footprint (~500MB vs ~200MB)
-- Build complexity (Maven vs pip)
 
 ## Configuration
 
@@ -227,13 +217,12 @@ java -jar target/mcp-server4j-1.0.0-SNAPSHOT.jar
 
 ## Troubleshooting
 
-### BM25 Index Not Loading
+### No Search Results
+
+The BM25 index is in-memory and must be rebuilt on each server restart:
 
 ```bash
-# Check if index exists
-ls -la data/lucene_bm25/
-
-# Re-run ingestion to rebuild
+# Re-run ingestion to rebuild BM25 index
 docker-compose run --rm -v "$(pwd)/documents:/docs" mcp-server ingest \
   --docs_dir "/docs" --chroma-host chroma --chroma-port 8000
 ```
@@ -278,23 +267,6 @@ Benchmark (29 markdown files, 873 chunks):
 - **Recall@5**: 100% on test queries
 - **Memory**: ~500MB Java heap + ChromaDB storage
 - **Startup**: ~5 seconds (Spring Boot + model loading)
-
-## Build Notes
-
-### Java Version
-
-This project requires **Java 21** (configured in `pom.xml`). Key dependencies:
-
-- **Lombok**: Using `edge-SNAPSHOT` for Java 21+ compatibility
-- **JUnit**: 6.0.1 with proper platform launcher support
-- **Spring Boot**: 3.5.8
-- **Testcontainers**: 2.0.2
-
-If you encounter compilation issues with newer Java versions, ensure:
-
-1. Maven Compiler Plugin is at least 3.14.0
-2. Lombok is using the edge-SNAPSHOT version from the edge releases repository
-3. JUnit Platform Launcher is included in test dependencies
 
 ## References
 
