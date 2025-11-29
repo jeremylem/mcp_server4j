@@ -1,7 +1,6 @@
 package com.mcp.server.mcp;
 
 import com.mcp.server.core.config.RetrievalConfig;
-
 import com.mcp.server.ingest.api.DocumentChunker;
 import com.mcp.server.ingest.chunker.RecursiveDocumentChunker;
 import com.mcp.server.ingest.indexer.LuceneBM25Indexer;
@@ -12,21 +11,24 @@ import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
+import java.util.List;
+
 /**
  * Test configuration for MCP Server integration tests.
- *
+ * <p>
  * Provides test implementations for:
  * - Retriever (BaselineRetriever)
  * - ChromaDB (connected via TestContainers)
  * - Test embedding model (fast random vectors)
  * - BM25 indexer (in-memory)
  * - Document chunker
- *
+ * <p>
  * Uses @DynamicPropertySource from the test to connect to TestContainers ChromaDB.
  */
 @TestConfiguration
@@ -95,7 +97,7 @@ public class McpServerTestConfig {
      */
     private static class TestEmbeddingModel implements EmbeddingModel {
         @Override
-        public Response<Embedding> embed(String text) {
+        public Response<@NotNull Embedding> embed(String text) {
             // Return deterministic embedding based on text hash
             // This ensures same text always gets same vector (critical for search to work!)
             float[] vector = new float[384]; // all-MiniLM-L6-v2 size
@@ -122,12 +124,12 @@ public class McpServerTestConfig {
         }
 
         @Override
-        public Response<Embedding> embed(TextSegment textSegment) {
+        public Response<@NotNull Embedding> embed(TextSegment textSegment) {
             return embed(textSegment.text());
         }
 
         @Override
-        public Response<java.util.List<Embedding>> embedAll(java.util.List<TextSegment> textSegments) {
+        public Response<@NotNull List<Embedding>> embedAll(java.util.List<TextSegment> textSegments) {
             java.util.List<Embedding> embeddings = new java.util.ArrayList<>();
             for (TextSegment segment : textSegments) {
                 embeddings.add(embed(segment).content());

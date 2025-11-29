@@ -1,18 +1,11 @@
 package com.mcp.server.mcp.models;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.List;
 
 /**
  * Output from knowledge base query tool.
- *
- * Contains list of relevant documents with metadata and confidence scores.
- * This is the response format returned to MCP clients (like Claude Desktop).
+ * Response format returned to MCP clients (like Claude Desktop).
  */
-@Setter
-@Getter
 public class KnowledgeBaseOutput {
 
     private List<KnowledgeBaseDocument> documents;
@@ -30,4 +23,19 @@ public class KnowledgeBaseOutput {
         this.summary = summary;
     }
 
+    public List<KnowledgeBaseDocument> getDocuments() {
+        return documents;
+    }
+
+    public void setDocuments(List<KnowledgeBaseDocument> documents) {
+        this.documents = documents;
+    }
+
+    public String getSummary() {
+        return summary;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
 }

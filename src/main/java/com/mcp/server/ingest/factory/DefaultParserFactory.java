@@ -8,10 +8,10 @@ import java.util.List;
 
 /**
  * Default implementation of ParserFactory.
- *
+ * <p>
  * Creates standard parsers (Markdown, PDF).
  * New parsers can be added here or create a custom factory implementation.
- *
+ * <p>
  * Follows Open/Closed Principle - new parsers can be added by:
  * 1. Creating a new parser class implementing DocumentParser
  * 2. Adding it to this factory

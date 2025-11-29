@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 
 /**
  * Finds markdown and PDF files in a directory.
- *
+ * <p>
  * Filtering rules:
  * - Includes: *.md and *.pdf files
  * - Excludes: README.md and CLAUDE.md in root directory
@@ -39,23 +39,23 @@ public class MarkdownAndPdfFinder implements DocumentFinder {
 
         try (Stream<Path> paths = Files.walk(directory)) {
             paths.filter(Files::isRegularFile)
-                .forEach(path -> {
-                    String filename = path.getFileName().toString();
+                    .forEach(path -> {
+                        String filename = path.getFileName().toString();
 
-                    // Filter markdown files (exclude README.md and CLAUDE.md in root)
-                    if (filename.endsWith(".md")) {
-                        if (!filename.equals("README.md") && !filename.equals("CLAUDE.md")) {
-                            mdFiles.add(path);
-                        } else if (path.toString().contains("documents")) {
-                            // Include README/CLAUDE if they're in documents/ subdirectory
-                            mdFiles.add(path);
+                        // Filter markdown files (exclude README.md and CLAUDE.md in root)
+                        if (filename.endsWith(".md")) {
+                            if (!filename.equals("README.md") && !filename.equals("CLAUDE.md")) {
+                                mdFiles.add(path);
+                            } else if (path.toString().contains("documents")) {
+                                // Include README/CLAUDE if they're in documents/ subdirectory
+                                mdFiles.add(path);
+                            }
                         }
-                    }
-                    // Include PDF files
-                    else if (filename.endsWith(".pdf")) {
-                        pdfFiles.add(path);
-                    }
-                });
+                        // Include PDF files
+                        else if (filename.endsWith(".pdf")) {
+                            pdfFiles.add(path);
+                        }
+                    });
         } catch (IOException e) {
             throw new DocumentFinderException("Failed to scan directory: " + directory, e);
         }

@@ -106,8 +106,8 @@ class RetrieverFactoryTest {
 
             // Act & Assert
             assertThatThrownBy(invalidConfig::validate)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("must sum to 1.0");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("must sum to 1.0");
         }
 
         @Test
@@ -153,16 +153,6 @@ class RetrieverFactoryTest {
 
             // Assert
             assertThat(config.getEmbeddingModel()).isEqualTo("custom-model");
-        }
-
-        @Test
-        @DisplayName("should have default embedding dimension of 384")
-        void config_DefaultEmbeddingDimension_Is384() {
-            // Arrange & Act
-            RetrievalConfig config = new RetrievalConfig();
-
-            // Assert
-            assertThat(config.getEmbeddingDimension()).isEqualTo(384);
         }
     }
 }

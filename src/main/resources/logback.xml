@@ -23,21 +23,21 @@
     </appender>
 
     <!-- Logger for our application -->
-    <logger name="com.mcp.server" level="INFO" />
+    <logger name="com.mcp.server" level="INFO"/>
 
     <!-- Logger for LangChain4j (reduce verbosity) -->
-    <logger name="dev.langchain4j" level="WARN" />
+    <logger name="dev.langchain4j" level="WARN"/>
 
     <!-- Logger for Lucene (reduce verbosity) -->
-    <logger name="org.apache.lucene" level="WARN" />
+    <logger name="org.apache.lucene" level="WARN"/>
 
     <!-- Logger for ChromaDB client (reduce verbosity) -->
-    <logger name="dev.langchain4j.store.embedding.chroma" level="INFO" />
+    <logger name="dev.langchain4j.store.embedding.chroma" level="INFO"/>
 
     <!-- Root logger -->
     <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
 
 </configuration>

@@ -1,8 +1,6 @@
 package com.mcp.server.retrieval;
 
 import com.mcp.server.core.config.RetrievalConfig;
-import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.Metadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,9 +37,9 @@ class RetrieverFactoryIntegrationTest {
 
             // Act
             BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
-                chromaHost,
-                chromaPort,
-                collectionName
+                    chromaHost,
+                    chromaPort,
+                    collectionName
             );
 
             // Assert
@@ -56,9 +54,9 @@ class RetrieverFactoryIntegrationTest {
             String chromaHost = chromaContainer.getHost();
             int chromaPort = chromaContainer.getFirstMappedPort();
             BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
-                chromaHost,
-                chromaPort,
-                "test_init_collection"
+                    chromaHost,
+                    chromaPort,
+                    "test_init_collection"
             );
 
             // Act & Assert - Should not throw
@@ -86,10 +84,10 @@ class RetrieverFactoryIntegrationTest {
 
             // Act
             BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
-                chromaHost,
-                chromaPort,
-                collectionName,
-                customConfig
+                    chromaHost,
+                    chromaPort,
+                    collectionName,
+                    customConfig
             );
 
             // Assert
@@ -111,12 +109,12 @@ class RetrieverFactoryIntegrationTest {
 
             // Act & Assert
             assertThatThrownBy(() -> RetrieverFactory.createTestRetriever(
-                chromaHost,
-                chromaPort,
-                collectionName,
-                invalidConfig
+                    chromaHost,
+                    chromaPort,
+                    collectionName,
+                    invalidConfig
             )).isInstanceOf(IllegalStateException.class)
-              .hasMessageContaining("must sum to 1.0");
+                    .hasMessageContaining("must sum to 1.0");
         }
 
         @Test
@@ -129,10 +127,10 @@ class RetrieverFactoryIntegrationTest {
 
             // Act
             BaselineRetriever retriever = RetrieverFactory.createTestRetriever(
-                chromaContainer.getHost(),
-                chromaContainer.getFirstMappedPort(),
-                "test",
-                config
+                    chromaContainer.getHost(),
+                    chromaContainer.getFirstMappedPort(),
+                    "test",
+                    config
             );
 
             // Assert

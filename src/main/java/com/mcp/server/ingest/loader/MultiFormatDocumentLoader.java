@@ -15,27 +15,21 @@ import java.util.List;
 
 /**
  * Loads documents using multiple parsers based on file type.
- *
- * Refactored to follow SOLID principles:
- * - Strategy Pattern: Delegates to DocumentParser implementations
- * - Dependency Inversion: Depends on ParserFactory abstraction
- * - Open/Closed: New parsers can be added via factory without modifying this class
+ * <p>
  */
-public class MultiFormatDocumentLoader implements DocumentLoader {
+public record MultiFormatDocumentLoader(List<DocumentParser> parsers) implements DocumentLoader {
 
     private static final Logger logger = LoggerFactory.getLogger(MultiFormatDocumentLoader.class);
-    private final List<DocumentParser> parsers;
 
     /**
      * Constructor with parser injection.
      *
      * @param parsers List of parsers to use
      */
-    public MultiFormatDocumentLoader(List<DocumentParser> parsers) {
-        if (parsers == null || parsers.isEmpty()) {
+    public MultiFormatDocumentLoader {
+        if (parsers.isEmpty()) {
             throw new IllegalArgumentException("At least one parser is required");
         }
-        this.parsers = parsers;
     }
 
     /**
@@ -78,7 +72,7 @@ public class MultiFormatDocumentLoader implements DocumentLoader {
         }
 
         logger.info("Total documents loaded: {} (success: {}, failures: {})",
-            documents.size(), successCount, failureCount);
+                documents.size(), successCount, failureCount);
 
         if (documents.isEmpty() && !paths.isEmpty()) {
             throw new DocumentLoadException("Failed to load any documents from " + paths.size() + " files");

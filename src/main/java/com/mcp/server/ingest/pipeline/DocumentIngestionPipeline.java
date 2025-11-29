@@ -61,13 +61,13 @@ public class DocumentIngestionPipeline implements IngestionPipeline {
 
             int totalChunks = vectorStore.count();
             logger.info("Ingestion complete: {} docs, {} chunks, {} total",
-                documents.size(), chunks.size(), totalChunks);
+                    documents.size(), chunks.size(), totalChunks);
 
             return new IngestionResult(
-                documents.size(),
-                chunks.size(),
-                totalChunks,
-                request.getCollectionName()
+                    documents.size(),
+                    chunks.size(),
+                    totalChunks,
+                    request.getCollectionName()
             );
 
         } catch (IngestionException e) {

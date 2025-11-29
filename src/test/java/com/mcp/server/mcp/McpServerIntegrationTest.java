@@ -21,16 +21,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test for MCP Server.
- *
- * Tests the full MCP server functionality including:
- * - Spring Boot application startup
- * - MCP tool registration (query_knowledge_base)
- * - Retriever integration
- * - Hybrid search functionality
- *
- * Uses TestContainers to spin up a real ChromaDB instance for testing.
- * This makes the test self-contained and doesn't require external ChromaDB.
+ * Integration test for MCP Server with TestContainers ChromaDB.
  */
 @SpringBootTest
 @Import(McpServerTestConfig.class)
@@ -41,10 +32,6 @@ class McpServerIntegrationTest {
     @Container
     static ChromaDBContainer chromaContainer = new ChromaDBContainer("chromadb/chroma:0.4.23");
 
-    /**
-     * Configure Spring Boot to use the TestContainers ChromaDB instance.
-     * This overrides the properties from application-test.yml.
-     */
     @DynamicPropertySource
     static void setChromaProperties(DynamicPropertyRegistry registry) {
         registry.add("chroma.host", chromaContainer::getHost);
@@ -86,10 +73,10 @@ class McpServerIntegrationTest {
     @Test
     void testRetrieverIntegration() {
         // Test retriever is properly configured and can query
-        List<Map<String, Object>> results = retriever.query("Python programming", 3, true, null);
+        List<Map<String, Object>> results = retriever.query("Python programming", 3, true);
 
         assertThat(results).isNotEmpty();
-        assertThat(results.get(0)).containsKeys("content", "metadata", "confidence");
+        assertThat(results.getFirst()).containsKeys("content", "metadata", "confidence");
     }
 
     @Test
@@ -110,19 +97,19 @@ class McpServerIntegrationTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getDocuments()).isNotEmpty();
-        assertThat(result.getDocuments().get(0).getContent()).contains("BM25");
+        assertThat(result.getDocuments().getFirst().content()).contains("BM25");
     }
 
     @Test
     void testHybridSearchVsVectorOnly() {
         // Test that hybrid search works differently than vector-only
-        List<Map<String, Object>> hybridResults = retriever.query("Java", 3, true, null);
-        List<Map<String, Object>> vectorResults = retriever.query("Java", 3, false, null);
+        List<Map<String, Object>> hybridResults = retriever.query("Java", 3, true);
+        List<Map<String, Object>> vectorResults = retriever.query("Java", 3, false);
 
         assertThat(hybridResults).isNotEmpty();
         assertThat(vectorResults).isNotEmpty();
 
         // Both should find relevant documents
-        assertThat(hybridResults.get(0).get("content").toString()).contains("Java");
+        assertThat(hybridResults.getFirst().get("content").toString()).contains("Java");
     }
 }

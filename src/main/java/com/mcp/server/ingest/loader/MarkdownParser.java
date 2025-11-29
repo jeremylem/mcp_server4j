@@ -12,7 +12,7 @@ import java.nio.file.Path;
 
 /**
  * Parses markdown files using LangChain4j's TextDocumentParser.
- *
+ * <p>
  * Adds metadata:
  * - source: Full file path
  * - filename: File name only

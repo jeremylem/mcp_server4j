@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 
 /**
  * Default implementation of IngestionComponentFactory.
- *
+ * <p>
  * Creates production-ready concrete implementations of all components:
  * - MarkdownAndPdfFinder for document discovery
  * - MultiFormatDocumentLoader with markdown and PDF parsers
@@ -39,8 +39,8 @@ public class DefaultIngestionComponentFactory implements IngestionComponentFacto
     @Override
     public DocumentChunker createDocumentChunker(IngestConfig config) {
         return new RecursiveDocumentChunker(
-            config.getChunkSize(),
-            config.getChunkOverlap()
+                config.chunkSize(),
+                config.chunkOverlap()
         );
     }
 
@@ -52,6 +52,6 @@ public class DefaultIngestionComponentFactory implements IngestionComponentFacto
 
     @Override
     public VectorStore createVectorStore(String chromaHost, int chromaPort, String collectionName, IngestConfig config) {
-        return new ChromaVectorStore(chromaHost, chromaPort, collectionName, config);
+        return new ChromaVectorStore(chromaHost, chromaPort, collectionName);
     }
 }

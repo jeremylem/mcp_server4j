@@ -4,8 +4,6 @@ import java.nio.file.Path;
 
 /**
  * Request parameters for document ingestion.
- *
- * Uses the Builder pattern for clean, flexible construction.
  */
 public class IngestionRequest {
 
@@ -29,14 +27,6 @@ public class IngestionRequest {
 
     public String getCollectionName() {
         return collectionName;
-    }
-
-    public String getChromaHost() {
-        return chromaHost;
-    }
-
-    public int getChromaPort() {
-        return chromaPort;
     }
 
     public boolean isReIngest() {
@@ -93,6 +83,6 @@ public class IngestionRequest {
     @Override
     public String toString() {
         return String.format("IngestionRequest{docsDir=%s, collection='%s', chromaHost='%s', chromaPort=%d, reIngest=%s}",
-            docsDir, collectionName, chromaHost, chromaPort, reIngest);
+                docsDir, collectionName, chromaHost, chromaPort, reIngest);
     }
 }

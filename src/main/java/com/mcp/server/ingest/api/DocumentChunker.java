@@ -7,8 +7,6 @@ import java.util.List;
 
 /**
  * Splits documents into smaller chunks for indexing and embedding.
- *
- * Implementations should handle chunk size, overlap, and metadata preservation.
  */
 public interface DocumentChunker {
 

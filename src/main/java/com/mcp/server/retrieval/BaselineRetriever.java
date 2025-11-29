@@ -1,7 +1,12 @@
 package com.mcp.server.retrieval;
 
 import com.mcp.server.core.config.RetrievalConfig;
+import com.mcp.server.core.interfaces.DocumentChunker;
+import com.mcp.server.core.interfaces.DocumentManager;
+import com.mcp.server.core.interfaces.Initializable;
+import com.mcp.server.core.interfaces.QueryService;
 import com.mcp.server.core.models.SearchResult;
+import com.mcp.server.ingest.indexer.LuceneBM25Indexer;
 import dev.langchain4j.data.document.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,10 +22,10 @@ import java.util.Map;
  */
 public class BaselineRetriever
         implements
-            com.mcp.server.core.interfaces.QueryService,
-            com.mcp.server.core.interfaces.DocumentManager,
-            com.mcp.server.core.interfaces.Initializable,
-            com.mcp.server.core.interfaces.DocumentChunker {
+        QueryService,
+        DocumentManager,
+        Initializable,
+        DocumentChunker {
 
     private static final Logger logger = LoggerFactory.getLogger(BaselineRetriever.class);
 
@@ -52,9 +57,8 @@ public class BaselineRetriever
         logger.info("Loading persisted BM25 index...");
 
         try {
-            if (bm25Indexer instanceof com.mcp.server.ingest.indexer.LuceneBM25Indexer) {
-                com.mcp.server.ingest.indexer.LuceneBM25Indexer luceneIndexer =
-                    (com.mcp.server.ingest.indexer.LuceneBM25Indexer) bm25Indexer;
+            if (bm25Indexer != null) {
+                LuceneBM25Indexer luceneIndexer = bm25Indexer;
 
                 if (luceneIndexer.indexExistsOnDisk()) {
                     luceneIndexer.loadIndex();
@@ -70,41 +74,34 @@ public class BaselineRetriever
     }
 
     @Override
-    public List<Map<String, Object>> query(String query, int topK, boolean useHybrid, String filterType) {
-        logger.info("Query: '{}' (hybrid={}, topK={}, filter={})", query, useHybrid, topK, filterType);
+    public List<Map<String, Object>> query(String query, int topK, boolean useHybrid) {
+        logger.info("Query: '{}' (hybrid={}, topK={})", query, useHybrid, topK);
 
-        if (query == null || query.trim().isEmpty()) {
+        if (query.trim().isEmpty()) {
             logger.warn("Empty query");
             return new ArrayList<>();
         }
-
-        Map<String, String> filterMetadata = null;
-        if (filterType != null && !filterType.isEmpty()) {
-            filterMetadata = new HashMap<>();
-            filterMetadata.put("type", filterType);
-        }
-
-        return useHybrid ? hybridSearch(query, topK, filterMetadata) : vectorOnlySearch(query, topK, filterMetadata);
+        return useHybrid ? hybridSearch(query, topK) : vectorOnlySearch(query, topK);
     }
 
-    private List<Map<String, Object>> hybridSearch(String query, int topK, Map<String, String> filterMetadata) {
+    private List<Map<String, Object>> hybridSearch(String query, int topK) {
         int candidatePoolSize = config.getCandidatePoolSize();
 
         List<SearchResult> bm25Results = bm25Indexer.search(query, candidatePoolSize);
-        List<VectorSearchResult> vectorResults = vectorSearch.search(query, candidatePoolSize, filterMetadata);
+        List<VectorSearchResult> vectorResults = vectorSearch.search(query, candidatePoolSize);
         List<Map<String, Object>> results = scoreFusion.fuse(bm25Results, vectorResults, topK);
 
         logger.info("Hybrid search: {} results", results.size());
         return results;
     }
 
-    private List<Map<String, Object>> vectorOnlySearch(String query, int topK, Map<String, String> filterMetadata) {
-        List<VectorSearchResult> vectorResults = vectorSearch.search(query, topK, filterMetadata);
+    private List<Map<String, Object>> vectorOnlySearch(String query, int topK) {
+        List<VectorSearchResult> vectorResults = vectorSearch.search(query, topK);
 
         List<Map<String, Object>> results = new ArrayList<>();
         for (VectorSearchResult result : vectorResults) {
-            Document doc = result.getDocument();
-            double confidence = 1.0 / (1.0 + result.getDistance());
+            Document doc = result.document();
+            double confidence = 1.0 / (1.0 + result.distance());
 
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put("content", doc.text());

@@ -15,17 +15,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * MCP Tool for querying the knowledge base.
- *
- * Refactored to follow SOLID principles:
- * - Dependency Inversion: Depends on QueryService interface (not concrete Retriever)
- * - Interface Segregation: Only uses query capability, not document management
- *
- * Exposes the RAG system through Model Context Protocol (MCP) so that
- * AI assistants (like Claude Desktop) can search the knowledge base.
- *
- * This tool uses hybrid search (BM25 + Vector) to find relevant documents
- * and returns them with confidence scores.
+ * MCP tool for querying the knowledge base.
+ * Exposes hybrid search (BM25 + vector) through the Model Context Protocol.
  */
 @Component
 public class KnowledgeBaseTool implements Function<KnowledgeBaseTool.Request, KnowledgeBaseOutput> {
@@ -54,16 +45,14 @@ public class KnowledgeBaseTool implements Function<KnowledgeBaseTool.Request, Kn
             @JsonProperty(defaultValue = "true")
             @JsonPropertyDescription("Use hybrid search (true) or vector-only (false)")
             Boolean useHybrid
-    ) {}
+    ) {
+    }
 
     /**
-     * Query the knowledge base using hybrid search.
+     * Query the knowledge base.
      *
-     * Combines BM25 keyword search with vector semantic search for
-     * robust retrieval across diverse document types.
-     *
-     * @param request The query request containing search parameters
-     * @return KnowledgeBaseOutput containing relevant documents with confidence scores
+     * @param request Search parameters (query, topK, useHybrid)
+     * @return Documents with confidence scores
      */
     @Override
     public KnowledgeBaseOutput apply(Request request) {
@@ -75,7 +64,7 @@ public class KnowledgeBaseTool implements Function<KnowledgeBaseTool.Request, Kn
 
         try {
             // Query using QueryService interface
-            List<Map<String, Object>> results = queryService.query(query, topK, useHybrid, null);
+            List<Map<String, Object>> results = queryService.query(query, topK, useHybrid);
 
             // Convert to KnowledgeBaseDocument objects
             List<KnowledgeBaseDocument> documents = results.stream()

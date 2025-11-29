@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * Chunks documents using recursive character-based splitting.
- *
+ * <p>
  * Wraps LangChain4j's DocumentSplitters.recursive() to provide
  * configurable chunk size and overlap.
  */
@@ -30,7 +30,7 @@ public class RecursiveDocumentChunker implements DocumentChunker {
     /**
      * Constructor with configurable chunk parameters.
      *
-     * @param chunkSize Maximum characters per chunk
+     * @param chunkSize    Maximum characters per chunk
      * @param chunkOverlap Number of overlapping characters between chunks
      */
     public RecursiveDocumentChunker(int chunkSize, int chunkOverlap) {

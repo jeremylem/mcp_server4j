@@ -16,11 +16,11 @@ import java.nio.file.Path;
 
 /**
  * Parses PDF files using Apache Tika via LangChain4j with PDFBox fallback.
- *
+ * <p>
  * Handles:
  * - Standard PDFs via Apache Tika
  * - Encrypted/DRM PDFs with restricted permissions (attempts extraction with PDFBox)
- *
+ * <p>
  * Adds metadata:
  * - source: Full file path
  * - filename: File name only
@@ -44,7 +44,7 @@ public class PdfParser implements DocumentParser {
     public Document parse(Path path) {
         logger.debug("Parsing PDF: {}", path.getFileName());
 
-        Document document = null;
+        Document document;
 
         if (isEncrypted(path)) {
             document = parseWithPdfBox(path);
@@ -86,7 +86,7 @@ public class PdfParser implements DocumentParser {
             doc.metadata().put("parser", "tika");
 
             logger.info("Successfully loaded PDF via Tika: {} ({} chars)",
-                path.getFileName(), doc.text().length());
+                    path.getFileName(), doc.text().length());
             return doc;
         } catch (Exception e) {
             throw new DocumentLoadException("Failed to parse PDF with Tika: " + path, e);
@@ -103,7 +103,7 @@ public class PdfParser implements DocumentParser {
                 AccessPermission permission = pdDocument.getCurrentAccessPermission();
                 if (!permission.canExtractContent()) {
                     throw new DocumentLoadException(
-                        "PDF is encrypted and does not allow content extraction: " + path);
+                            "PDF is encrypted and does not allow content extraction: " + path);
                 }
             }
 
@@ -125,7 +125,7 @@ public class PdfParser implements DocumentParser {
             doc.metadata().put("pages", String.valueOf(pdDocument.getNumberOfPages()));
 
             logger.info("Successfully loaded PDF via PDFBox: {} ({} chars, {} pages)",
-                path.getFileName(), text.length(), pdDocument.getNumberOfPages());
+                    path.getFileName(), text.length(), pdDocument.getNumberOfPages());
 
             return doc;
         } catch (Exception e) {

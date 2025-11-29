@@ -84,12 +84,12 @@ class BaselineRetrieverTest {
             // Arrange
             when(bm25Indexer.indexExistsOnDisk()).thenReturn(true);
             doThrow(new RuntimeException("Failed to load index"))
-                .when(bm25Indexer).loadIndex();
+                    .when(bm25Indexer).loadIndex();
 
             // Act & Assert
             assertThatThrownBy(() -> retriever.initialize())
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Initialization failed");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Initialization failed");
         }
     }
 
@@ -106,8 +106,8 @@ class BaselineRetrieverTest {
 
             // BM25 results (max score = 10.0)
             List<SearchResult> bm25Results = Arrays.asList(
-                new SearchResult("id1", "Aurora is a database", "aurora.md", 10.0f),
-                new SearchResult("id2", "AWS provides cloud services", "aws.md", 5.0f)
+                    new SearchResult("id1", "Aurora is a database", "aurora.md", 10.0f),
+                    new SearchResult("id2", "AWS provides cloud services", "aws.md", 5.0f)
             );
             when(bm25Indexer.search(query, 20)).thenReturn(bm25Results);
 
@@ -115,13 +115,13 @@ class BaselineRetrieverTest {
             Document doc1 = createDocument("Aurora is a database", "aurora.md");
             Document doc2 = createDocument("RDS is a database service", "rds.md");
             List<VectorSearchResult> vectorResults = Arrays.asList(
-                new VectorSearchResult(doc1, 0.1f), // similarity = 1/(1+0.1) = 0.909
-                new VectorSearchResult(doc2, 0.3f)  // similarity = 1/(1+0.3) = 0.769
+                    new VectorSearchResult(doc1, 0.1f), // similarity = 1/(1+0.1) = 0.909
+                    new VectorSearchResult(doc2, 0.3f)  // similarity = 1/(1+0.3) = 0.769
             );
-            when(vectorSearch.search(query, 20, null)).thenReturn(vectorResults);
+            when(vectorSearch.search(query, 20)).thenReturn(vectorResults);
 
             // Act
-            List<Map<String, Object>> results = retriever.query(query, topK, true, null);
+            List<Map<String, Object>> results = retriever.query(query, topK, true);
 
             // Assert
             assertThat(results).hasSize(2);
@@ -130,12 +130,12 @@ class BaselineRetrieverTest {
             // BM25 normalized: 10.0/10.0 = 1.0, weighted: 0.3 * 1.0 = 0.3
             // Vector similarity: 0.909, weighted: 0.7 * 0.909 = 0.636
             // Hybrid = 0.3 + 0.636 = 0.936
-            Map<String, Object> firstResult = results.get(0);
+            Map<String, Object> firstResult = results.getFirst();
             assertThat(firstResult.get("content")).isEqualTo("Aurora is a database");
             assertThat((Double) firstResult.get("confidence")).isGreaterThan(0.8);
 
             verify(bm25Indexer).search(query, 20);
-            verify(vectorSearch).search(query, 20, null);
+            verify(vectorSearch).search(query, 20);
         }
 
         @Test
@@ -146,23 +146,23 @@ class BaselineRetrieverTest {
 
             // Same document in both results
             List<SearchResult> bm25Results = Collections.singletonList(
-                new SearchResult("id1", "Test content", "test.md", 8.0f)
+                    new SearchResult("id1", "Test content", "test.md", 8.0f)
             );
             when(bm25Indexer.search(anyString(), anyInt())).thenReturn(bm25Results);
 
             Document doc = createDocument("Test content", "test.md");
             List<VectorSearchResult> vectorResults = Collections.singletonList(
-                new VectorSearchResult(doc, 0.2f)
+                    new VectorSearchResult(doc, 0.2f)
             );
-            when(vectorSearch.search(anyString(), anyInt(), any())).thenReturn(vectorResults);
+            when(vectorSearch.search(anyString(), anyInt())).thenReturn(vectorResults);
 
             // Act
-            List<Map<String, Object>> results = retriever.query(query, 5, true, null);
+            List<Map<String, Object>> results = retriever.query(query, 5, true);
 
             // Assert
             assertThat(results).hasSize(1);
             // Document appears in both searches, should have combined score
-            Double confidence = (Double) results.get(0).get("confidence");
+            Double confidence = (Double) results.getFirst().get("confidence");
             assertThat(confidence).isGreaterThan(0.0);
         }
 
@@ -175,19 +175,19 @@ class BaselineRetrieverTest {
 
             // More than topK results
             List<SearchResult> bm25Results = Arrays.asList(
-                new SearchResult("1", "Content 1", "f1.md", 10f),
-                new SearchResult("2", "Content 2", "f2.md", 9f),
-                new SearchResult("3", "Content 3", "f3.md", 8f),
-                new SearchResult("4", "Content 4", "f4.md", 7f),
-                new SearchResult("5", "Content 5", "f5.md", 6f)
+                    new SearchResult("1", "Content 1", "f1.md", 10f),
+                    new SearchResult("2", "Content 2", "f2.md", 9f),
+                    new SearchResult("3", "Content 3", "f3.md", 8f),
+                    new SearchResult("4", "Content 4", "f4.md", 7f),
+                    new SearchResult("5", "Content 5", "f5.md", 6f)
             );
             when(bm25Indexer.search(anyString(), anyInt())).thenReturn(bm25Results);
 
             List<VectorSearchResult> vectorResults = Collections.emptyList();
-            when(vectorSearch.search(anyString(), anyInt(), any())).thenReturn(vectorResults);
+            when(vectorSearch.search(anyString(), anyInt())).thenReturn(vectorResults);
 
             // Act
-            List<Map<String, Object>> results = retriever.query(query, topK, true, null);
+            List<Map<String, Object>> results = retriever.query(query, topK, true);
 
             // Assert
             assertThat(results).hasSize(topK);
@@ -198,10 +198,10 @@ class BaselineRetrieverTest {
         void query_HybridSearchNoResults_ReturnsEmptyList() {
             // Arrange
             when(bm25Indexer.search(anyString(), anyInt())).thenReturn(Collections.emptyList());
-            when(vectorSearch.search(anyString(), anyInt(), any())).thenReturn(Collections.emptyList());
+            when(vectorSearch.search(anyString(), anyInt())).thenReturn(Collections.emptyList());
 
             // Act
-            List<Map<String, Object>> results = retriever.query("no match query", 5, true, null);
+            List<Map<String, Object>> results = retriever.query("no match query", 5, true);
 
             // Assert
             assertThat(results).isEmpty();
@@ -215,14 +215,14 @@ class BaselineRetrieverTest {
 
             // BM25 with different scores (max = 20.0)
             List<SearchResult> bm25Results = Arrays.asList(
-                new SearchResult("1", "High score", "f1.md", 20.0f),
-                new SearchResult("2", "Low score", "f2.md", 5.0f)
+                    new SearchResult("1", "High score", "f1.md", 20.0f),
+                    new SearchResult("2", "Low score", "f2.md", 5.0f)
             );
             when(bm25Indexer.search(anyString(), anyInt())).thenReturn(bm25Results);
-            when(vectorSearch.search(anyString(), anyInt(), any())).thenReturn(Collections.emptyList());
+            when(vectorSearch.search(anyString(), anyInt())).thenReturn(Collections.emptyList());
 
             // Act
-            List<Map<String, Object>> results = retriever.query(query, 5, true, null);
+            List<Map<String, Object>> results = retriever.query(query, 5, true);
 
             // Assert
             assertThat(results).hasSize(2);
@@ -248,20 +248,20 @@ class BaselineRetrieverTest {
             Document doc1 = createDocument("Content 1", "file1.md");
             Document doc2 = createDocument("Content 2", "file2.md");
             List<VectorSearchResult> vectorResults = Arrays.asList(
-                new VectorSearchResult(doc1, 0.1f),
-                new VectorSearchResult(doc2, 0.2f)
+                    new VectorSearchResult(doc1, 0.1f),
+                    new VectorSearchResult(doc2, 0.2f)
             );
-            when(vectorSearch.search(query, topK, null)).thenReturn(vectorResults);
+            when(vectorSearch.search(query, topK)).thenReturn(vectorResults);
 
             // Act
-            List<Map<String, Object>> results = retriever.query(query, topK, false, null);
+            List<Map<String, Object>> results = retriever.query(query, topK, false);
 
             // Assert
             assertThat(results).hasSize(2);
             assertThat(results.get(0).get("content")).isEqualTo("Content 1");
             assertThat(results.get(1).get("content")).isEqualTo("Content 2");
 
-            verify(vectorSearch).search(query, topK, null);
+            verify(vectorSearch).search(query, topK);
             verify(bm25Indexer, never()).search(anyString(), anyInt());
         }
 
@@ -271,17 +271,17 @@ class BaselineRetrieverTest {
             // Arrange
             Document doc = createDocument("Test content", "test.md");
             List<VectorSearchResult> vectorResults = Collections.singletonList(
-                new VectorSearchResult(doc, 0.5f) // distance = 0.5
+                    new VectorSearchResult(doc, 0.5f) // distance = 0.5
             );
-            when(vectorSearch.search(anyString(), anyInt(), any())).thenReturn(vectorResults);
+            when(vectorSearch.search(anyString(), anyInt())).thenReturn(vectorResults);
 
             // Act
-            List<Map<String, Object>> results = retriever.query("test", 1, false, null);
+            List<Map<String, Object>> results = retriever.query("test", 1, false);
 
             // Assert
             assertThat(results).hasSize(1);
             // Confidence = 1 / (1 + 0.5) = 0.666...
-            Double confidence = (Double) results.get(0).get("confidence");
+            Double confidence = (Double) results.getFirst().get("confidence");
             assertThat(confidence).isCloseTo(0.666, within(0.01));
         }
     }
@@ -295,14 +295,14 @@ class BaselineRetrieverTest {
         void addDocuments_ValidDocuments_AddsAndRebuildsIndex() {
             // Arrange
             List<Document> newDocuments = Arrays.asList(
-                createDocument("New doc 1", "new1.md"),
-                createDocument("New doc 2", "new2.md")
+                    createDocument("New doc 1", "new1.md"),
+                    createDocument("New doc 2", "new2.md")
             );
 
             List<Document> allDocuments = Arrays.asList(
-                createDocument("Existing doc", "old.md"),
-                createDocument("New doc 1", "new1.md"),
-                createDocument("New doc 2", "new2.md")
+                    createDocument("Existing doc", "old.md"),
+                    createDocument("New doc 1", "new1.md"),
+                    createDocument("New doc 2", "new2.md")
             );
             when(vectorSearch.getAllDocuments()).thenReturn(allDocuments);
 
@@ -324,8 +324,8 @@ class BaselineRetrieverTest {
 
             // Act & Assert
             assertThatThrownBy(() -> retriever.addDocuments(documents))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to add documents");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Failed to add documents");
         }
     }
 
@@ -341,8 +341,8 @@ class BaselineRetrieverTest {
                     createDocument("Long content to be chunked", "doc.md")
             );
             List<Document> chunks = Arrays.asList(
-                createDocument("Chunk 1", "doc.md"),
-                createDocument("Chunk 2", "doc.md")
+                    createDocument("Chunk 1", "doc.md"),
+                    createDocument("Chunk 2", "doc.md")
             );
             when(documentChunker.chunkDocuments(documents)).thenReturn(chunks);
 
@@ -369,8 +369,8 @@ class BaselineRetrieverTest {
 
             // Act & Assert
             assertThatThrownBy(() -> new BaselineRetriever(vectorSearch, bm25Indexer, documentChunker, invalidConfig))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("must sum to 1.0");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("must sum to 1.0");
         }
 
         @Test
@@ -383,7 +383,7 @@ class BaselineRetrieverTest {
 
             // Act & Assert
             assertThatNoException().isThrownBy(() ->
-                new BaselineRetriever(vectorSearch, bm25Indexer, documentChunker, validConfig)
+                    new BaselineRetriever(vectorSearch, bm25Indexer, documentChunker, validConfig)
             );
         }
     }

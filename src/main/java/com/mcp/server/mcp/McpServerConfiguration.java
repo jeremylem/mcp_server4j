@@ -16,27 +16,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Configuration for MCP Server components.
- *
- * Refactored to follow SOLID principles:
- * - Uses focused interfaces (QueryService, Initializable) instead of fat Retriever
- * - Separates initialization logic from bean creation
- * - Better adherence to Single Responsibility Principle
- *
- * Wires up the RAG system components:
- * - ChromaDB vector store
- * - Embedding model (all-MiniLM-L6-v2)
- * - BM25 indexer
- * - Document chunker
- * - Retriever (orchestrates hybrid search)
+ * Spring configuration for the RAG system:
+ * ChromaDB, embedding model, BM25 indexer, and retriever.
  */
 @Configuration
-@org.springframework.context.annotation.Profile("!test")
+@Profile("!test")
 public class McpServerConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(McpServerConfiguration.class);
@@ -185,6 +175,52 @@ public class McpServerConfiguration {
                 throw new RuntimeException("Failed to initialize retriever", e);
             }
         };
+    }
+
+    /**
+     * Manually register MCP tools with the server.
+     * Creates a list of tool specifications that the MCP server will expose.
+     */
+    @Bean
+    public java.util.List<io.modelcontextprotocol.spec.McpSchema.Tool> mcpTools() {
+        logger.info("Manually registering MCP tools");
+
+        // Create JSON schema for the tool input with all required parameters
+        var inputSchema = new io.modelcontextprotocol.spec.McpSchema.JsonSchema(
+                "object", // type
+                java.util.Map.of(
+                        "query", java.util.Map.of(
+                                "type", "string",
+                                "description", "The search query or question to find relevant documents"
+                        ),
+                        "topK", java.util.Map.of(
+                                "type", "integer",
+                                "description", "Number of results to return (default: 5)"
+                        ),
+                        "useHybrid", java.util.Map.of(
+                                "type", "boolean",
+                                "description", "Use hybrid search combining BM25 and vector search (default: true)"
+                        )
+                ), // properties
+                java.util.List.of("query"), // required
+                null, // additionalProperties
+                null, // _$schema
+                null  // _meta
+        );
+
+        // Create tool with all required parameters
+        var tool = new io.modelcontextprotocol.spec.McpSchema.Tool(
+                "query_knowledge_base",
+                "Search the knowledge base using hybrid search (BM25 + Vector). Returns relevant documents with content, metadata, and confidence scores.",
+                null, // uri (optional)
+                inputSchema,
+                null, // context (optional)
+                null, // annotations (optional)
+                null  // _meta (optional)
+        );
+
+        logger.info("Registered MCP tool: {}", tool.name());
+        return java.util.List.of(tool);
     }
 
 }

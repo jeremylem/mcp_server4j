@@ -10,6 +10,7 @@ import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -61,16 +62,16 @@ class ChromaVectorSearchTest {
             // Create mock embedding
             float[] embeddingVector = new float[]{0.1f, 0.2f, 0.3f};
             Embedding queryEmbedding = new Embedding(embeddingVector);
-            Response<Embedding> embeddingResponse = Response.from(queryEmbedding);
+            Response<@NotNull Embedding> embeddingResponse = Response.from(queryEmbedding);
             when(embeddingModel.embed(query)).thenReturn(embeddingResponse);
 
             // Create mock search results
             TextSegment segment1 = TextSegment.from("Aurora has 30 second failover",
-                createMetadata("aurora.md", "technical_doc"));
+                    createMetadata("aurora.md", "technical_doc"));
             EmbeddingMatch<TextSegment> match1 = new EmbeddingMatch<>(0.95, "id1", queryEmbedding, segment1);
 
             TextSegment segment2 = TextSegment.from("Aurora is a managed database",
-                createMetadata("aws.md", "personal_note"));
+                    createMetadata("aws.md", "personal_note"));
             EmbeddingMatch<TextSegment> match2 = new EmbeddingMatch<>(0.85, "id2", queryEmbedding, segment2);
 
             List<EmbeddingMatch<TextSegment>> matches = Arrays.asList(match1, match2);
@@ -79,18 +80,18 @@ class ChromaVectorSearchTest {
             when(embeddingStore.search(any(EmbeddingSearchRequest.class))).thenReturn(searchResult);
 
             // Act
-            List<VectorSearchResult> results = vectorSearch.search(query, topK, null);
+            List<VectorSearchResult> results = vectorSearch.search(query, topK);
 
             // Assert
             assertThat(results).hasSize(2);
 
-            VectorSearchResult result1 = results.get(0);
-            assertThat(result1.getDocument().text()).isEqualTo("Aurora has 30 second failover");
-            assertThat(result1.getDistance()).isEqualTo(0.05f); // 1 - 0.95
+            VectorSearchResult result1 = results.getFirst();
+            assertThat(result1.document().text()).isEqualTo("Aurora has 30 second failover");
+            assertThat(result1.distance()).isEqualTo(0.05f); // 1 - 0.95
 
             VectorSearchResult result2 = results.get(1);
-            assertThat(result2.getDocument().text()).isEqualTo("Aurora is a managed database");
-            assertThat(result2.getDistance()).isEqualTo(0.15f); // 1 - 0.85
+            assertThat(result2.document().text()).isEqualTo("Aurora is a managed database");
+            assertThat(result2.distance()).isEqualTo(0.15f); // 1 - 0.85
 
             verify(embeddingModel).embed(query);
             verify(embeddingStore).search(any(EmbeddingSearchRequest.class));
@@ -107,13 +108,13 @@ class ChromaVectorSearchTest {
             Embedding queryEmbedding = new Embedding(embeddingVector);
             when(embeddingModel.embed(query)).thenReturn(Response.from(queryEmbedding));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
+                    .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
 
             ArgumentCaptor<EmbeddingSearchRequest> requestCaptor =
-                ArgumentCaptor.forClass(EmbeddingSearchRequest.class);
+                    ArgumentCaptor.forClass(EmbeddingSearchRequest.class);
 
             // Act
-            vectorSearch.search(query, topK, null);
+            vectorSearch.search(query, topK);
 
             // Assert
             verify(embeddingStore).search(requestCaptor.capture());
@@ -130,10 +131,10 @@ class ChromaVectorSearchTest {
             Embedding queryEmbedding = new Embedding(embeddingVector);
             when(embeddingModel.embed(query)).thenReturn(Response.from(queryEmbedding));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
+                    .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
 
             // Act
-            List<VectorSearchResult> results = vectorSearch.search(query, 5, null);
+            List<VectorSearchResult> results = vectorSearch.search(query, 5);
 
             // Assert
             assertThat(results).isEmpty();
@@ -154,15 +155,15 @@ class ChromaVectorSearchTest {
             TextSegment segment = TextSegment.from("content", metadata);
             EmbeddingMatch<TextSegment> match = new EmbeddingMatch<>(0.9, "id1", queryEmbedding, segment);
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenReturn(new EmbeddingSearchResult<>(Collections.singletonList(match)));
+                    .thenReturn(new EmbeddingSearchResult<>(Collections.singletonList(match)));
 
             // Act
-            List<VectorSearchResult> results = vectorSearch.search(query, 1, null);
+            List<VectorSearchResult> results = vectorSearch.search(query, 1);
 
             // Assert
             assertThat(results).hasSize(1);
             Map<String, String> resultMetadata = ChromaVectorSearch.metadataToMap(
-                results.get(0).getDocument().metadata()
+                    results.getFirst().document().metadata()
             );
             assertThat(resultMetadata).containsEntry("filename", "test.md");
             assertThat(resultMetadata).containsEntry("type", "personal_note");
@@ -201,9 +202,9 @@ class ChromaVectorSearchTest {
         void addDocuments_MultipleDocuments_GeneratesEmbeddingsForEach() {
             // Arrange
             List<Document> documents = Arrays.asList(
-                Document.from("Doc 1", new Metadata()),
-                Document.from("Doc 2", new Metadata()),
-                Document.from("Doc 3", new Metadata())
+                    Document.from("Doc 1", new Metadata()),
+                    Document.from("Doc 2", new Metadata()),
+                    Document.from("Doc 3", new Metadata())
             );
 
             float[] dummyEmbedding = new float[]{0.1f};
@@ -228,8 +229,8 @@ class ChromaVectorSearchTest {
 
             // Act & Assert
             assertThatThrownBy(() -> vectorSearch.addDocuments(Collections.singletonList(doc)))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to add documents to vector store");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Failed to add documents to vector store");
         }
     }
 
@@ -249,11 +250,11 @@ class ChromaVectorSearchTest {
             TextSegment segment2 = TextSegment.from("Content 2", createMetadata("file2.md", "doc"));
 
             List<EmbeddingMatch<TextSegment>> matches = Arrays.asList(
-                new EmbeddingMatch<>(0.9, "id1", queryEmbedding, segment1),
-                new EmbeddingMatch<>(0.8, "id2", queryEmbedding, segment2)
+                    new EmbeddingMatch<>(0.9, "id1", queryEmbedding, segment1),
+                    new EmbeddingMatch<>(0.8, "id2", queryEmbedding, segment2)
             );
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenReturn(new EmbeddingSearchResult<>(matches));
+                    .thenReturn(new EmbeddingSearchResult<>(matches));
 
             // Act
             List<Document> documents = vectorSearch.getAllDocuments();
@@ -271,7 +272,7 @@ class ChromaVectorSearchTest {
             float[] dummyEmbedding = new float[]{0.1f};
             when(embeddingModel.embed("document")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
+                    .thenReturn(new EmbeddingSearchResult<>(Collections.emptyList()));
 
             // Act
             List<Document> documents = vectorSearch.getAllDocuments();
@@ -287,12 +288,12 @@ class ChromaVectorSearchTest {
             float[] dummyEmbedding = new float[]{0.1f};
             when(embeddingModel.embed("document")).thenReturn(Response.from(new Embedding(dummyEmbedding)));
             when(embeddingStore.search(any(EmbeddingSearchRequest.class)))
-                .thenThrow(new RuntimeException("ChromaDB connection failed"));
+                    .thenThrow(new RuntimeException("ChromaDB connection failed"));
 
             // Act & Assert
             assertThatThrownBy(() -> vectorSearch.getAllDocuments())
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to fetch documents from ChromaDB");
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Failed to fetch documents from ChromaDB");
         }
     }
 
@@ -320,7 +321,7 @@ class ChromaVectorSearchTest {
         @DisplayName("should return empty map for null metadata")
         void metadataToMap_NullMetadata_ReturnsEmptyMap() {
             // Arrange & Act
-            Map<String, String> map = ChromaVectorSearch.metadataToMap(null);
+            Map<String, String> map = ChromaVectorSearch.metadataToMap(new Metadata());
 
             // Assert
             assertThat(map).isEmpty();

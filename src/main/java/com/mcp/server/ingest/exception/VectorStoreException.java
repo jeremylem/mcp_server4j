@@ -5,10 +5,6 @@ package com.mcp.server.ingest.exception;
  */
 public class VectorStoreException extends IngestionException {
 
-    public VectorStoreException(String message) {
-        super(message);
-    }
-
     public VectorStoreException(String message, Throwable cause) {
         super(message, cause);
     }

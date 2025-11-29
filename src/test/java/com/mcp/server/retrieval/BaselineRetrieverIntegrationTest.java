@@ -35,33 +35,33 @@ class BaselineRetrieverIntegrationTest {
     static void setUpAll() {
         // Create retriever with TestContainer connection (using test method for in-memory BM25)
         retriever = RetrieverFactory.createTestRetriever(
-            chromaContainer.getHost(),
-            chromaContainer.getFirstMappedPort(),
-            COLLECTION_NAME
+                chromaContainer.getHost(),
+                chromaContainer.getFirstMappedPort(),
+                COLLECTION_NAME
         );
 
         // Ingest test documents once for all tests
         List<Document> documents = Arrays.asList(
-            createDocument(
-                "AWS Aurora is a MySQL and PostgreSQL-compatible relational database. " +
-                "Aurora provides up to 5 times better performance than MySQL with the security, " +
-                "availability, and reliability of a commercial database at 1/10th the cost.",
-                "aurora.md",
-                "technical_doc"
-            ),
-            createDocument(
-                "The CAP theorem states that a distributed system can only guarantee two of three properties: " +
-                "Consistency, Availability, and Partition tolerance. This is a fundamental trade-off in " +
-                "distributed systems design.",
-                "cap_theorem.md",
-                "personal_note"
-            ),
-            createDocument(
-                "Kubernetes is a container orchestration platform. It automates deployment, scaling, and " +
-                "management of containerized applications. Kubernetes was originally designed by Google.",
-                "kubernetes.md",
-                "technical_doc"
-            )
+                createDocument(
+                        "AWS Aurora is a MySQL and PostgreSQL-compatible relational database. " +
+                                "Aurora provides up to 5 times better performance than MySQL with the security, " +
+                                "availability, and reliability of a commercial database at 1/10th the cost.",
+                        "aurora.md",
+                        "technical_doc"
+                ),
+                createDocument(
+                        "The CAP theorem states that a distributed system can only guarantee two of three properties: " +
+                                "Consistency, Availability, and Partition tolerance. This is a fundamental trade-off in " +
+                                "distributed systems design.",
+                        "cap_theorem.md",
+                        "personal_note"
+                ),
+                createDocument(
+                        "Kubernetes is a container orchestration platform. It automates deployment, scaling, and " +
+                                "management of containerized applications. Kubernetes was originally designed by Google.",
+                        "kubernetes.md",
+                        "technical_doc"
+                )
         );
 
         retriever.addDocuments(documents);
@@ -79,19 +79,19 @@ class BaselineRetrieverIntegrationTest {
         void ingestAndSearch_MultipleDocuments_MakesSearchable() {
             // Documents already ingested in @BeforeAll
             // Assert - Query for Aurora
-            List<Map<String, Object>> auroraResults = retriever.query("AWS Aurora database", 3, true, null);
+            List<Map<String, Object>> auroraResults = retriever.query("AWS Aurora database", 3, true);
             assertThat(auroraResults).isNotEmpty();
-            assertThat(auroraResults.get(0).get("content").toString()).contains("Aurora");
+            assertThat(auroraResults.getFirst().get("content").toString()).contains("Aurora");
 
             // Assert - Query for CAP theorem
-            List<Map<String, Object>> capResults = retriever.query("CAP theorem distributed systems", 3, true, null);
+            List<Map<String, Object>> capResults = retriever.query("CAP theorem distributed systems", 3, true);
             assertThat(capResults).isNotEmpty();
-            assertThat(capResults.get(0).get("content").toString()).contains("CAP theorem");
+            assertThat(capResults.getFirst().get("content").toString()).contains("CAP theorem");
 
             // Assert - Query for Kubernetes
-            List<Map<String, Object>> k8sResults = retriever.query("container orchestration Kubernetes", 3, true, null);
+            List<Map<String, Object>> k8sResults = retriever.query("container orchestration Kubernetes", 3, true);
             assertThat(k8sResults).isNotEmpty();
-            assertThat(k8sResults.get(0).get("content").toString()).contains("Kubernetes");
+            assertThat(k8sResults.getFirst().get("content").toString()).contains("Kubernetes");
         }
 
         @Test
@@ -101,12 +101,12 @@ class BaselineRetrieverIntegrationTest {
             // Arrange - Documents already ingested in previous test
 
             // Act - Hybrid search
-            List<Map<String, Object>> hybridResults = retriever.query("database performance", 5, true, null);
+            List<Map<String, Object>> hybridResults = retriever.query("database performance", 5, true);
 
             // Assert - Should find Aurora (has both keywords)
             assertThat(hybridResults).isNotEmpty();
             boolean foundAurora = hybridResults.stream()
-                .anyMatch(r -> r.get("content").toString().contains("Aurora"));
+                    .anyMatch(r -> r.get("content").toString().contains("Aurora"));
             assertThat(foundAurora).isTrue();
 
             // All results should have confidence scores
@@ -123,18 +123,13 @@ class BaselineRetrieverIntegrationTest {
             // Arrange - Documents already ingested
 
             // Act - Vector-only search (no BM25)
-            List<Map<String, Object>> vectorResults = retriever.query(
-                "managing containers at scale",  // Semantic match for Kubernetes
-                3,
-                false,  // vector-only
-                null
-            );
+            List<Map<String, Object>> vectorResults = retriever.query("managing containers at scale", 3, false);
 
             // Assert
             assertThat(vectorResults).isNotEmpty();
             // Should find Kubernetes doc based on semantic similarity
             boolean foundK8s = vectorResults.stream()
-                .anyMatch(r -> r.get("content").toString().contains("Kubernetes"));
+                    .anyMatch(r -> r.get("content").toString().contains("Kubernetes"));
             assertThat(foundK8s).isTrue();
         }
 
@@ -145,7 +140,7 @@ class BaselineRetrieverIntegrationTest {
             // Arrange - Documents already ingested
 
             // Act
-            List<Map<String, Object>> results = retriever.query("AWS database", 3, true, null);
+            List<Map<String, Object>> results = retriever.query("AWS database", 3, true);
 
             // Assert - Results should be sorted by confidence (descending)
             assertThat(results).isNotEmpty();
@@ -163,7 +158,7 @@ class BaselineRetrieverIntegrationTest {
             // Arrange - 3 documents ingested
 
             // Act - Request only 2 results
-            List<Map<String, Object>> results = retriever.query("system", 2, true, null);
+            List<Map<String, Object>> results = retriever.query("system", 2, true);
 
             // Assert
             assertThat(results).hasSizeLessThanOrEqualTo(2);
@@ -177,16 +172,14 @@ class BaselineRetrieverIntegrationTest {
 
             // Act - Query for something completely different
             List<Map<String, Object>> results = retriever.query(
-                "quantum entanglement particle physics",
-                5,
-                true,
-                null
-            );
+                    "quantum entanglement particle physics",
+                    5,
+                    true);
 
             // Assert - May return some results with very low confidence, or empty
             // Either way, confidence should be low if results exist
             if (!results.isEmpty()) {
-                Double topConfidence = (Double) results.get(0).get("confidence");
+                Double topConfidence = (Double) results.getFirst().get("confidence");
                 assertThat(topConfidence).isLessThan(0.5); // Low confidence for unrelated query
             }
         }
@@ -198,11 +191,11 @@ class BaselineRetrieverIntegrationTest {
             // Arrange - Documents with metadata already ingested
 
             // Act
-            List<Map<String, Object>> results = retriever.query("Aurora", 1, true, null);
+            List<Map<String, Object>> results = retriever.query("Aurora", 1, true);
 
             // Assert
             assertThat(results).isNotEmpty();
-            Map<String, Object> firstResult = results.get(0);
+            Map<String, Object> firstResult = results.getFirst();
             assertThat(firstResult).containsKey("metadata");
 
             @SuppressWarnings("unchecked")
@@ -219,11 +212,12 @@ class BaselineRetrieverIntegrationTest {
 
         @Test
         @DisplayName("should complete hybrid search within reasonable time")
-        @Timeout(5) // 5 seconds max
+        @Timeout(5)
+            // 5 seconds max
         void query_HybridSearch_CompletesQuickly() {
             // Act
             long startTime = System.currentTimeMillis();
-            List<Map<String, Object>> results = retriever.query("database", 5, true, null);
+            List<Map<String, Object>> results = retriever.query("database", 5, true);
             long duration = System.currentTimeMillis() - startTime;
 
             // Assert
@@ -236,16 +230,16 @@ class BaselineRetrieverIntegrationTest {
         void query_Concurrent_HandlesMultipleQueries() {
             // Arrange
             String[] queries = {
-                "database performance",
-                "distributed systems",
-                "container orchestration"
+                    "database performance",
+                    "distributed systems",
+                    "container orchestration"
             };
 
             // Act - Execute multiple queries in parallel
             List<List<Map<String, Object>>> results = Arrays.stream(queries)
-                .parallel()
-                .map(query -> retriever.query(query, 3, true, null))
-                .toList();
+                    .parallel()
+                    .map(query -> retriever.query(query, 3, true))
+                    .toList();
 
             // Assert - All queries should complete successfully
             assertThat(results).hasSize(3);
@@ -264,7 +258,7 @@ class BaselineRetrieverIntegrationTest {
         @DisplayName("should handle empty query gracefully")
         void query_EmptyQuery_HandlesGracefully() {
             // Act
-            List<Map<String, Object>> results = retriever.query("", 5, true, null);
+            List<Map<String, Object>> results = retriever.query("", 5, true);
 
             // Assert - Should not throw, may return empty or all docs
             assertThat(results).isNotNull();
@@ -275,9 +269,9 @@ class BaselineRetrieverIntegrationTest {
         void initialize_NoDocuments_HandlesGracefully() {
             // Arrange - Create a new retriever with empty collection
             BaselineRetriever emptyRetriever = RetrieverFactory.createTestRetriever(
-                chromaContainer.getHost(),
-                chromaContainer.getFirstMappedPort(),
-                "empty_collection"
+                    chromaContainer.getHost(),
+                    chromaContainer.getFirstMappedPort(),
+                    "empty_collection"
             );
 
             // Act & Assert - Should not throw

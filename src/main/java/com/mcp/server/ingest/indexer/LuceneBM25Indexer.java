@@ -19,7 +19,6 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +30,14 @@ import java.util.List;
 
 /**
  * BM25 keyword indexer using Apache Lucene.
- *
+ * <p>
  * Implements KeywordIndexer interface for SOLID compliance.
  * Supports both in-memory (ByteBuffersDirectory) and persistent (FSDirectory) storage.
- *
+ * <p>
  * BM25 Parameters:
  * - k1 = 1.2 (term frequency saturation)
  * - b = 0.75 (document length normalization)
- *
+ * <p>
  * These match the Python rank-bm25 defaults for consistency.
  */
 public class LuceneBM25Indexer implements KeywordIndexer {
@@ -62,7 +61,8 @@ public class LuceneBM25Indexer implements KeywordIndexer {
      * Constructor for in-memory indexer (backward compatibility).
      */
     public LuceneBM25Indexer() {
-        this(null);
+        this.analyzer = new StandardAnalyzer();
+        this.indexPath = null;
     }
 
     /**
@@ -74,11 +74,7 @@ public class LuceneBM25Indexer implements KeywordIndexer {
         this.analyzer = new StandardAnalyzer();
         this.indexPath = indexPath;
 
-        if (indexPath != null) {
-            logger.info("LuceneBM25Indexer configured for persistent storage: {}", indexPath);
-        } else {
-            logger.info("LuceneBM25Indexer configured for in-memory storage");
-        }
+        logger.info("LuceneBM25Indexer configured for persistent storage: {}", indexPath);
     }
 
     /**
@@ -233,7 +229,7 @@ public class LuceneBM25Indexer implements KeywordIndexer {
             // Convert results to SearchResult objects
             List<SearchResult> results = new ArrayList<>();
             for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
-                org.apache.lucene.document.Document doc = indexSearcher.doc(scoreDoc.doc);
+                org.apache.lucene.document.Document doc = indexSearcher.storedFields().document(scoreDoc.doc);
 
                 String id = doc.get("id");
                 String content = doc.get("content");
@@ -249,11 +245,6 @@ public class LuceneBM25Indexer implements KeywordIndexer {
         } catch (Exception e) {
             throw new IndexingException("Failed to search BM25 index for query: " + queryText, e);
         }
-    }
-
-    @Override
-    public boolean isIndexBuilt() {
-        return indexBuilt;
     }
 
     @Override

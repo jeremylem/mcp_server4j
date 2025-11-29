@@ -1,8 +1,6 @@
 package com.mcp.server.retrieval;
 
 import com.mcp.server.core.config.RetrievalConfig;
-import com.mcp.server.core.interfaces.DocumentManager;
-import com.mcp.server.core.interfaces.QueryService;
 import com.mcp.server.ingest.api.DocumentChunker;
 import com.mcp.server.ingest.chunker.RecursiveDocumentChunker;
 import com.mcp.server.ingest.indexer.LuceneBM25Indexer;
@@ -14,151 +12,14 @@ import dev.langchain4j.store.embedding.chroma.ChromaEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 
 /**
- * Factory for creating BaselineRetriever instances with all dependencies.
- *
- * Handles dependency creation and wiring following the Factory pattern.
- * Makes it easy to create retrievers for different environments (dev, test, prod).
+ * Factory for creating configured retriever instances.
  */
 public class RetrieverFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(RetrieverFactory.class);
-
-    // BM25 index path (must match ingestion pipeline)
-    private static final Path BM25_INDEX_PATH = Paths.get("/data/bm25_index");
-
-    /**
-     * Create a QueryService with default configuration.
-     * Preferred method for components that only need query capabilities.
-     *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
-     * @param collectionName Collection name
-     * @return Configured QueryService
-     */
-    public static QueryService createQueryService(
-            String chromaHost,
-            int chromaPort,
-            String collectionName
-    ) {
-        return createBaselineRetriever(chromaHost, chromaPort, collectionName, new RetrievalConfig());
-    }
-
-    /**
-     * Create a QueryService with custom configuration.
-     * Preferred method for components that only need query capabilities.
-     *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
-     * @param collectionName Collection name
-     * @param config Retrieval configuration
-     * @return Configured QueryService
-     */
-    public static QueryService createQueryService(
-            String chromaHost,
-            int chromaPort,
-            String collectionName,
-            RetrievalConfig config
-    ) {
-        return createBaselineRetriever(chromaHost, chromaPort, collectionName, config);
-    }
-
-    /**
-     * Create a DocumentManager with default configuration.
-     * Preferred method for components that only need document management capabilities.
-     *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
-     * @param collectionName Collection name
-     * @return Configured DocumentManager
-     */
-    public static DocumentManager createDocumentManager(
-            String chromaHost,
-            int chromaPort,
-            String collectionName
-    ) {
-        return createBaselineRetriever(chromaHost, chromaPort, collectionName, new RetrievalConfig());
-    }
-
-    /**
-     * Create a BaselineRetriever with default configuration.
-     * Public method for tests and code that needs the concrete implementation.
-     *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
-     * @param collectionName Collection name
-     * @return Configured BaselineRetriever
-     */
-    public static BaselineRetriever createBaselineRetriever(
-            String chromaHost,
-            int chromaPort,
-            String collectionName
-    ) {
-        return createBaselineRetriever(chromaHost, chromaPort, collectionName, new RetrievalConfig());
-    }
-
-    /**
-     * Create a BaselineRetriever with custom configuration.
-     * Public method for tests and code that needs the concrete implementation.
-     *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
-     * @param collectionName Collection name
-     * @param config Retrieval configuration
-     * @return Configured BaselineRetriever
-     */
-    public static BaselineRetriever createBaselineRetriever(
-            String chromaHost,
-            int chromaPort,
-            String collectionName,
-            RetrievalConfig config
-    ) {
-        logger.info("Creating BaselineRetriever...");
-        logger.info("  ChromaDB: {}:{}", chromaHost, chromaPort);
-        logger.info("  Collection: {}", collectionName);
-        logger.info("  Embedding Model: {}", config.getEmbeddingModel());
-        logger.info("  BM25 Weight: {}, Vector Weight: {}", config.getBm25Weight(), config.getVectorWeight());
-
-        // 1. Create Embedding Model
-        EmbeddingModel embeddingModel = createEmbeddingModel(config);
-
-        // 2. Create ChromaDB Embedding Store
-        EmbeddingStore<TextSegment> embeddingStore = ChromaEmbeddingStore.builder()
-                .baseUrl(String.format("http://%s:%d", chromaHost, chromaPort))
-                .collectionName(collectionName)
-                .timeout(Duration.ofSeconds(30))
-                .build();
-
-        logger.info("ChromaDB embedding store created");
-
-        // 3. Create Vector Search component
-        ChromaVectorSearch vectorSearch = new ChromaVectorSearch(embeddingStore, embeddingModel);
-
-        // 4. Create BM25 Indexer (with persistent storage)
-        LuceneBM25Indexer bm25Indexer = new LuceneBM25Indexer(BM25_INDEX_PATH);
-        logger.info("BM25 indexer configured with persistent storage: {}", BM25_INDEX_PATH);
-
-        // 5. Create Document Chunker
-        DocumentChunker documentChunker = new RecursiveDocumentChunker(
-                config.getChunkSize(),
-                config.getChunkOverlap()
-        );
-
-        // 6. Create and return BaselineRetriever
-        BaselineRetriever retriever = new BaselineRetriever(
-                vectorSearch,
-                bm25Indexer,
-                documentChunker,
-                config
-        );
-
-        logger.info("BaselineRetriever created successfully");
-        return retriever;
-    }
 
     /**
      * Create embedding model based on configuration.
@@ -185,8 +46,8 @@ public class RetrieverFactory {
      * Create a BaselineRetriever for testing with in-memory BM25 indexer.
      * Uses a temporary directory for the BM25 index that doesn't require /data access.
      *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
+     * @param chromaHost     ChromaDB host
+     * @param chromaPort     ChromaDB port
      * @param collectionName Collection name
      * @return Configured BaselineRetriever for testing
      */
@@ -202,10 +63,10 @@ public class RetrieverFactory {
      * Create a BaselineRetriever for testing with in-memory BM25 indexer and custom config.
      * Uses a temporary directory for the BM25 index that doesn't require /data access.
      *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
+     * @param chromaHost     ChromaDB host
+     * @param chromaPort     ChromaDB port
      * @param collectionName Collection name
-     * @param config Retrieval configuration
+     * @param config         Retrieval configuration
      * @return Configured BaselineRetriever for testing
      */
     public static BaselineRetriever createTestRetriever(

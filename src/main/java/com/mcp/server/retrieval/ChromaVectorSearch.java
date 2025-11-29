@@ -18,58 +18,36 @@ import java.util.Map;
 
 /**
  * Vector search using ChromaDB.
- *
+ * <p>
  * Provides semantic search capabilities using embeddings.
  */
-public class ChromaVectorSearch {
+public record ChromaVectorSearch(EmbeddingStore<TextSegment> embeddingStore, EmbeddingModel embeddingModel) {
 
     private static final Logger logger = LoggerFactory.getLogger(ChromaVectorSearch.class);
-
-    private final EmbeddingStore<TextSegment> embeddingStore;
-    private final EmbeddingModel embeddingModel;
-
-    public ChromaVectorSearch(
-            EmbeddingStore<TextSegment> embeddingStore,
-            EmbeddingModel embeddingModel
-    ) {
-        this.embeddingStore = embeddingStore;
-        this.embeddingModel = embeddingModel;
-    }
 
     /**
      * Perform vector similarity search.
      *
      * @param query The search query
-     * @param topK Number of results to return
-     * @param filterMetadata Optional metadata filter
+     * @param topK  Number of results to return
      * @return List of documents with distance scores
      */
-    public List<VectorSearchResult> search(String query, int topK, Map<String, String> filterMetadata) {
+    public List<VectorSearchResult> search(String query, int topK) {
         logger.debug("Performing vector search for: '{}' (topK={})", query, topK);
 
-        // Embed the query
         Embedding queryEmbedding = embeddingModel.embed(query).content();
 
-        // Build search request
         EmbeddingSearchRequest.EmbeddingSearchRequestBuilder requestBuilder =
                 EmbeddingSearchRequest.builder()
                         .queryEmbedding(queryEmbedding)
                         .maxResults(topK);
 
-        // Add metadata filter if provided
-        // Note: LangChain4j 0.36.2 uses simple metadata filtering
-        // For now, we'll skip complex filtering and handle it post-search
-        // In newer versions, use Filter API for better control
-
-        // Execute search
         List<EmbeddingMatch<TextSegment>> matches = embeddingStore.search(requestBuilder.build()).matches();
 
-        // Convert to VectorSearchResult
         List<VectorSearchResult> results = new ArrayList<>();
         for (EmbeddingMatch<TextSegment> match : matches) {
             TextSegment segment = match.embedded();
 
-            // Convert TextSegment to Document
             Document doc = Document.from(segment.text(), segment.metadata());
 
             // Distance score (lower is better)
@@ -162,11 +140,9 @@ public class ChromaVectorSearch {
      */
     public static Map<String, String> metadataToMap(Metadata metadata) {
         Map<String, String> map = new HashMap<>();
-        if (metadata != null) {
-            metadata.toMap().forEach((key, value) ->
+        metadata.toMap().forEach((key, value) ->
                 map.put(key, value != null ? value.toString() : null)
-            );
-        }
+        );
         return map;
     }
 }

@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Factory for creating document parsers.
- *
+ * <p>
  * Follows Dependency Inversion Principle and Open/Closed Principle.
  * Allows adding new parsers without modifying existing code.
  */

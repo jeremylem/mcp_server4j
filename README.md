@@ -1,22 +1,23 @@
 # MCP Server 4J - Local Knowledge Base
 
-Java implementation of a local knowledge base using the Model Context Protocol (MCP). Query your documents with hybrid search (BM25 + vector similarity).
+Java implementation of a local knowledge base using the Model Context Protocol (MCP). Query your documents with hybrid
+search (BM25 + vector similarity).
 
 ## Features
 
-- Hybrid search (BM25 keyword + vector semantic similarity)
-- SOLID architecture with interface-driven design
-- Spring Boot dependency injection
-- Persistent BM25 index + ChromaDB vector storage
-- MCP protocol support
-- Multi-format: PDF, Markdown, TXT via Apache Tika
+- **Hybrid search**: BM25 keyword + vector semantic similarity
+- **Interface-driven design**: Clean separation of concerns with QueryService, DocumentManager
+- **Spring Boot**: Dependency injection and configuration management
+- **Persistent storage**: BM25 index + ChromaDB vector store
+- **MCP protocol**: Query via JSON-RPC or REST API
+- **Multi-format support**: PDF, Markdown, TXT via Apache Tika + PDFBox
 
 ## Quick Start
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- Java 17+ (for local development)
+- Java 21+ (for local development)
 - Maven 3.8+ (for local development)
 
 ### 1. Add Documents
@@ -45,6 +46,28 @@ docker-compose run --rm -v "$(pwd)/documents:/docs" mcp-server ingest \
 
 ### 4. Query Your Knowledge Base
 
+**Via MCP JSON-RPC endpoint:**
+
+```bash
+curl -X POST http://localhost:8001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "query_knowledge_base",
+      "arguments": {
+        "query": "What is the CAP theorem?",
+        "topK": 5,
+        "useHybrid": true
+      }
+    }
+  }'
+```
+
+**Via REST API:**
+
 ```bash
 curl -X POST http://localhost:8001/api/query \
   -H "Content-Type: application/json" \
@@ -57,32 +80,44 @@ curl -X POST http://localhost:8001/api/query \
 
 ## Architecture
 
-**Ingestion** (`com.mcp.server.ingest`)
+### Ingestion Pipeline
 
-- MultiFormatDocumentLoader - Loads PDF, Markdown, TXT via Apache Tika
-- RecursiveDocumentChunker - Splits into 512-char chunks, 50 overlap
-- ChromaVectorStore - Embeddings via all-MiniLM-L6-v2
-- LuceneBM25Indexer - Persistent BM25 keyword index
+```
+Documents → MultiFormatLoader → Chunker → BM25 Index + Vector Store
+```
 
-**Retrieval** (`com.mcp.server.retrieval`)
+**Key Components:**
 
-- BaselineRetriever - Hybrid search orchestration
-- ChromaVectorSearch - Semantic search via LangChain4j
-- HybridScoreFusion - 30% BM25 + 70% Vector (default)
-- QueryController - REST API
+- `MultiFormatDocumentLoader` - PDF, Markdown, TXT via Apache Tika
+- `RecursiveDocumentChunker` - 512-char chunks, 50-char overlap
+- `LuceneBM25Indexer` - Persistent keyword index
+- `ChromaVectorStore` - Embeddings via all-MiniLM-L6-v2
 
-**Config** (`com.mcp.server.core.config`)
+### Retrieval Pipeline
 
-- IngestConfig - Chunking params
-- RetrievalConfig - Fusion weights
-- McpServerConfiguration - Spring beans
+```
+Query → BM25 Search + Vector Search → Score Fusion → Ranked Results
+```
 
-Core interfaces: QueryService, DocumentManager, DocumentChunker, Initializable
+**Key Components:**
+
+- `BaselineRetriever` - Orchestrates hybrid search
+- `ChromaVectorSearch` - Semantic similarity via LangChain4j
+- `HybridScoreFusion` - Weighted combination (default: 30% BM25 + 70% vector)
+- `KnowledgeBaseTool` - MCP protocol interface
+- `QueryController` - REST API endpoint
+
+### Core Interfaces
+
+- `QueryService` - Search operations
+- `DocumentManager` - Document ingestion
+- `DocumentChunker` - Text splitting
+- `Initializable` - Lifecycle management
 
 ## Differences from Python Version
 
 | Aspect               | Python Version                           | Java Version                              |
-| -------------------- | ---------------------------------------- | ----------------------------------------- |
+|----------------------|------------------------------------------|-------------------------------------------|
 | **Language**         | Python 3.11                              | Java 21                                   |
 | **Framework**        | FastMCP + FastAPI                        | Spring Boot + MCP protocol                |
 | **DI Container**     | Manual wiring                            | Spring IoC container                      |
@@ -100,53 +135,51 @@ Core interfaces: QueryService, DocumentManager, DocumentChunker, Initializable
 
 ### Why Java?
 
-Advantages:
+**Advantages:**
 
-- Type safety and compile-time checks
-- Spring Boot DI and externalized config
-- Lucene native BM25, ONNX embeddings
-- Better IDE support for refactoring
+- Strong type safety and compile-time error detection
+- Spring Boot ecosystem (DI, config management, testing)
+- Native Lucene BM25 with persistent indexes
+- ONNX runtime for embeddings (no Python dependencies)
+- Enterprise-grade tooling and IDE support
+- Clear interfaces and testability
 
-Tradeoffs:
+**Tradeoffs:**
 
-- More verbose (~10x code size)
-- Slower development
-- Higher memory (~500MB vs ~200MB)
-- Maven vs pip complexity
+- More verbose (~10x code size vs Python)
+- Longer development cycles
+- Higher memory footprint (~500MB vs ~200MB)
+- Build complexity (Maven vs pip)
 
 ## Configuration
 
 ### Retrieval Settings
 
-Edit `src/main/java/com/mcp/server/core/config/RetrievalConfig.java`:
+Edit `src/main/resources/application.yml`:
 
-```java
-@Bean
-public RetrievalConfig retrievalConfig() {
-    return RetrievalConfig.builder()
-        .bm25Weight(0.3)           // Keyword importance (0-1)
-        .vectorWeight(0.7)         // Semantic importance (0-1)
-        .candidatePoolSize(20)     // Candidates before fusion
-        .build();
-}
+```yaml
+retrieval:
+  bm25-weight: 0.3           # Keyword importance (0-1)
+  vector-weight: 0.7         # Semantic importance (0-1)
+  candidate-pool-size: 20    # Candidates before fusion
+```
+
+Or set environment variables:
+
+```bash
+RETRIEVAL_BM25_WEIGHT=0.3
+RETRIEVAL_VECTOR_WEIGHT=0.7
+RETRIEVAL_CANDIDATE_POOL_SIZE=20
 ```
 
 ### Ingestion Settings
 
-Edit `src/main/java/com/mcp/server/core/config/IngestConfig.java`:
+Chunk size and overlap are configured in the ingestion pipeline:
 
-```java
-@Bean
-public IngestConfig ingestConfig() {
-    return IngestConfig.builder()
-        .chunkSize(512)            // Characters per chunk
-        .chunkOverlap(50)          // Overlap between chunks
-        .inputDirectory("./documents")
-        .chromaHost("localhost")
-        .chromaPort(8000)
-        .build();
-}
-```
+- Default chunk size: 512 characters
+- Default overlap: 50 characters
+
+To customize, modify `RecursiveDocumentChunker` initialization in your configuration.
 
 ## Development
 
@@ -156,9 +189,11 @@ public IngestConfig ingestConfig() {
 # Compile and package
 mvn clean package
 
-# Run tests
-mvn test
+# Run unit tests only
+mvn clean test
 
+# Run with integration tests (requires Docker for ChromaDB)
+mvn clean verify
 ```
 
 ### Docker Build
@@ -175,16 +210,19 @@ docker-compose build --no-cache mcp-server
 
 ```bash
 # Start ChromaDB
-docker run -p 8000:8000 chromadb/chroma
+docker run -p 8000:8000 chromadb/chroma:0.4.24
+
+# Build the JAR
+mvn clean package
 
 # Run ingestion CLI
-java -jar target/mcp-server-1.0.0.jar ingest \
+java -jar target/mcp-server4j-1.0.0-SNAPSHOT.jar ingest \
   --docs_dir ./documents \
   --chroma-host localhost \
   --chroma-port 8000
 
 # Run MCP server
-java -jar target/mcp-server-1.0.0.jar
+java -jar target/mcp-server4j-1.0.0-SNAPSHOT.jar
 ```
 
 ## Troubleshooting
@@ -233,12 +271,30 @@ ENTRYPOINT ["java", "-Xmx1g", "-jar", "app.jar"]
 
 ## Performance
 
-Test corpus (29 markdown files, 873 chunks):
+Benchmark (29 markdown files, 873 chunks):
 
-- Ingestion: ~30 seconds
-- Query: ~20-30ms average
-- Accuracy: 100% R@5
-- Memory: ~500MB Java heap + ChromaDB
+- **Ingestion**: ~30 seconds
+- **Query latency**: ~20-30ms average
+- **Recall@5**: 100% on test queries
+- **Memory**: ~500MB Java heap + ChromaDB storage
+- **Startup**: ~5 seconds (Spring Boot + model loading)
+
+## Build Notes
+
+### Java Version
+
+This project requires **Java 21** (configured in `pom.xml`). Key dependencies:
+
+- **Lombok**: Using `edge-SNAPSHOT` for Java 21+ compatibility
+- **JUnit**: 6.0.1 with proper platform launcher support
+- **Spring Boot**: 3.5.8
+- **Testcontainers**: 2.0.2
+
+If you encounter compilation issues with newer Java versions, ensure:
+
+1. Maven Compiler Plugin is at least 3.14.0
+2. Lombok is using the edge-SNAPSHOT version from the edge releases repository
+3. JUnit Platform Launcher is included in test dependencies
 
 ## References
 

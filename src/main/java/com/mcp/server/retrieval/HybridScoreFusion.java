@@ -12,17 +12,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Performs hybrid score fusion combining BM25 and vector search results.
- *
- * Follows Single Responsibility Principle - focused only on score fusion logic.
- * Implements weighted score combination for hybrid search.
- *
- * Algorithm:
- * 1. Normalize BM25 scores (divide by max score)
- * 2. Convert vector distances to similarity scores (1 / (1 + distance))
- * 3. Apply configured weights to each score type
- * 4. Combine scores for documents found in both searches
- * 5. Sort by final hybrid score
+ * Combines BM25 and vector search scores using weighted fusion.
+ * Normalizes scores, applies weights, and ranks results.
  */
 public class HybridScoreFusion {
 
@@ -35,12 +26,7 @@ public class HybridScoreFusion {
     }
 
     /**
-     * Fuse BM25 and vector search results into a single ranked list.
-     *
-     * @param bm25Results Results from BM25 keyword search
-     * @param vectorResults Results from vector semantic search
-     * @param topK Number of final results to return
-     * @return List of fused results sorted by hybrid score
+     * Fuse BM25 and vector search results.
      */
     public List<Map<String, Object>> fuse(
             List<SearchResult> bm25Results,
@@ -101,11 +87,11 @@ public class HybridScoreFusion {
      */
     private void addVectorScores(List<VectorSearchResult> vectorResults, Map<String, HybridScore> hybridScores) {
         for (VectorSearchResult result : vectorResults) {
-            Document doc = result.getDocument();
+            Document doc = result.document();
             String docId = getDocumentId(doc);
 
             // Convert distance to similarity: 1 / (1 + distance)
-            float similarity = 1.0f / (1.0f + result.getDistance());
+            float similarity = 1.0f / (1.0f + result.distance());
             float weightedScore = config.getVectorWeight() * similarity;
 
             if (hybridScores.containsKey(docId)) {
@@ -189,8 +175,16 @@ public class HybridScoreFusion {
             this.score += additionalScore;
         }
 
-        String getContent() { return content; }
-        Map<String, String> getMetadata() { return metadata; }
-        float getScore() { return score; }
+        String getContent() {
+            return content;
+        }
+
+        Map<String, String> getMetadata() {
+            return metadata;
+        }
+
+        float getScore() {
+            return score;
+        }
     }
 }

@@ -1,6 +1,5 @@
 package com.mcp.server.ingest.store;
 
-import com.mcp.server.core.config.IngestConfig;
 import com.mcp.server.ingest.api.VectorStore;
 import com.mcp.server.ingest.exception.VectorStoreException;
 import dev.langchain4j.data.document.Document;
@@ -17,7 +16,7 @@ import java.util.List;
 
 /**
  * ChromaDB-based vector store implementation.
- *
+ * <p>
  * Handles document chunking, embedding generation, and storage in ChromaDB.
  * Uses all-MiniLM-L6-v2 embedding model (384 dimensions).
  */
@@ -36,7 +35,6 @@ public class ChromaVectorStore implements VectorStore {
     private final String chromaHost;
     private final int chromaPort;
     private final String collectionName;
-    private final IngestConfig config;
 
     private EmbeddingStore<TextSegment> embeddingStore;
     private EmbeddingModel embeddingModel;
@@ -44,16 +42,14 @@ public class ChromaVectorStore implements VectorStore {
     /**
      * Constructor with configuration.
      *
-     * @param chromaHost ChromaDB host
-     * @param chromaPort ChromaDB port
+     * @param chromaHost     ChromaDB host
+     * @param chromaPort     ChromaDB port
      * @param collectionName Collection name
-     * @param config Ingestion configuration
      */
-    public ChromaVectorStore(String chromaHost, int chromaPort, String collectionName, IngestConfig config) {
+    public ChromaVectorStore(String chromaHost, int chromaPort, String collectionName) {
         this.chromaHost = chromaHost;
         this.chromaPort = chromaPort;
         this.collectionName = collectionName;
-        this.config = config;
 
         initializeComponents();
     }
@@ -72,9 +68,9 @@ public class ChromaVectorStore implements VectorStore {
             // Create ChromaDB embedding store
             String baseUrl = String.format("http://%s:%d", chromaHost, chromaPort);
             this.embeddingStore = ChromaEmbeddingStore.builder()
-                .baseUrl(baseUrl)
-                .collectionName(collectionName)
-                .build();
+                    .baseUrl(baseUrl)
+                    .collectionName(collectionName)
+                    .build();
             logger.info("ChromaDB store initialized: {}", baseUrl);
             logger.info("Ingestor pipeline initialized");
 
@@ -124,9 +120,9 @@ public class ChromaVectorStore implements VectorStore {
 
     private EmbeddingStoreIngestor createBatchIngestor() {
         return EmbeddingStoreIngestor.builder()
-            .embeddingModel(embeddingModel)
-            .embeddingStore(embeddingStore)
-            .build();
+                .embeddingModel(embeddingModel)
+                .embeddingStore(embeddingStore)
+                .build();
     }
 
     @Override

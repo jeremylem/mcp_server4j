@@ -16,53 +16,53 @@ import java.util.concurrent.Callable;
 
 /**
  * Command-line interface for document ingestion.
- *
+ * <p>
  * Uses the SOLID-compliant pipeline architecture with dependency injection
  * via factory pattern.
- *
+ * <p>
  * Usage:
- *   java -jar mcp-server4j.jar --docs_dir ./documents
- *   java -jar mcp-server4j.jar --docs_dir ./documents --re-ingest
+ * java -jar mcp-server4j.jar --docs_dir ./documents
+ * java -jar mcp-server4j.jar --docs_dir ./documents --re-ingest
  */
 @Command(
-    name = "ingest",
-    mixinStandardHelpOptions = true,
-    version = "1.0.0",
-    description = "Ingest documents into baseline_kb collection with hybrid BM25 + vector search"
+        name = "ingest",
+        mixinStandardHelpOptions = true,
+        version = "1.0.0",
+        description = "Ingest documents into baseline_kb collection with hybrid BM25 + vector search"
 )
 public class IngestCLI implements Callable<Integer> {
 
     @Option(
-        names = {"--docs_dir"},
-        description = "Directory containing documents to ingest",
-        defaultValue = "./documents"
+            names = {"--docs_dir"},
+            description = "Directory containing documents to ingest",
+            defaultValue = "./documents"
     )
     private String docsDir;
 
     @Option(
-        names = {"--re-ingest"},
-        description = "Delete collection and re-ingest all documents from scratch"
+            names = {"--re-ingest"},
+            description = "Delete collection and re-ingest all documents from scratch"
     )
     private boolean reIngest;
 
     @Option(
-        names = {"--chroma-host"},
-        description = "ChromaDB host",
-        defaultValue = "chroma"
+            names = {"--chroma-host"},
+            description = "ChromaDB host",
+            defaultValue = "chroma"
     )
     private String chromaHost;
 
     @Option(
-        names = {"--chroma-port"},
-        description = "ChromaDB port",
-        defaultValue = "8000"
+            names = {"--chroma-port"},
+            description = "ChromaDB port",
+            defaultValue = "8000"
     )
     private int chromaPort;
 
     @Option(
-        names = {"--collection"},
-        description = "ChromaDB collection name",
-        defaultValue = "baseline_kb"
+            names = {"--collection"},
+            description = "ChromaDB collection name",
+            defaultValue = "baseline_kb"
     )
     private String collectionName;
 
@@ -88,31 +88,31 @@ public class IngestCLI implements Callable<Integer> {
         IngestionComponentFactory factory = new DefaultIngestionComponentFactory();
 
         return DocumentIngestionPipeline.builder()
-            .withDocumentFinder(factory.createDocumentFinder())
-            .withDocumentLoader(factory.createDocumentLoader())
-            .withDocumentChunker(factory.createDocumentChunker(config))
-            .withKeywordIndexer(factory.createKeywordIndexer())
-            .withVectorStore(factory.createVectorStore(chromaHost, chromaPort, collectionName, config))
-            .build();
+                .withDocumentFinder(factory.createDocumentFinder())
+                .withDocumentLoader(factory.createDocumentLoader())
+                .withDocumentChunker(factory.createDocumentChunker(config))
+                .withKeywordIndexer(factory.createKeywordIndexer())
+                .withVectorStore(factory.createVectorStore(chromaHost, chromaPort, collectionName, config))
+                .build();
     }
 
     private IngestionRequest createRequest() {
         return IngestionRequest.builder()
-            .docsDir(Paths.get(docsDir))
-            .collectionName(collectionName)
-            .chromaHost(chromaHost)
-            .chromaPort(chromaPort)
-            .reIngest(reIngest)
-            .build();
+                .docsDir(Paths.get(docsDir))
+                .collectionName(collectionName)
+                .chromaHost(chromaHost)
+                .chromaPort(chromaPort)
+                .reIngest(reIngest)
+                .build();
     }
 
     private void printSuccess(IngestionResult result) {
         System.out.println();
         System.out.println("SUCCESS");
         System.out.println();
-        System.out.println("Documents processed: " + result.getDocumentsProcessed());
-        System.out.println("Chunks created: " + result.getChunksCreated());
-        System.out.println("Collection: " + result.getCollectionName());
+        System.out.println("Documents processed: " + result.documentsProcessed());
+        System.out.println("Chunks created: " + result.chunksCreated());
+        System.out.println("Collection: " + result.collectionName());
         System.out.println();
     }
 
