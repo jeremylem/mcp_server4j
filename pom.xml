@@ -19,13 +19,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Dependency Versions -->
-        <spring-boot.version>3.5.8</spring-boot.version>
-        <spring-ai.version>1.1.0</spring-ai.version>
+        <spring-boot.version>3.4.1</spring-boot.version>
+        <spring-ai.version>1.1.2</spring-ai.version>
         <langchain4j.version>1.8.0</langchain4j.version>
         <langchain4j-modules.version>1.8.0-beta15</langchain4j-modules.version>
         <lucene.version>9.10.0</lucene.version>
         <slf4j.version>2.0.9</slf4j.version>
-        <logback.version>1.5.21</logback.version>
+        <!-- logback version managed by Spring Boot -->
         <picocli.version>4.7.5</picocli.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
 
@@ -190,12 +190,7 @@
             <version>${slf4j.version}</version>
         </dependency>
 
-        <!-- Logback Classic (SLF4J Implementation) -->
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
-        </dependency>
+        <!-- Logback Classic managed by Spring Boot -->
 
         <!-- ============================================ -->
         <!-- Test Dependencies -->

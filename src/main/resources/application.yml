@@ -5,14 +5,12 @@ spring:
   ai:
     mcp:
       server:
-        # Enable MCP server
-        enabled: true
         # Server info
         name: "Knowledge Base RAG Server"
         version: "1.0.0"
-        # SSE endpoints (for HTTP-based MCP clients like Claude Code)
-        sse-endpoint: /sse
-        sse-message-endpoint: /mcp/message
+        type: SYNC
+        protocol: STREAMABLE
+
         # Enable automatic discovery of @McpTool annotated beans
         annotation-scanner:
           enabled: true
